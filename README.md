@@ -1,0 +1,112 @@
+# CEP Event Engine
+
+A rule-driven, event-driven network alarm correlation and problem-management
+engine. It receives raw events (SNMP traps, syslog, HTTP, file, Kafka), parses
+them with Groovy scripts, and produces normalized alarms and problems with
+deduplication, severity grading, and lifecycle resolution.
+
+> The engine is fully decoupled from any specific vendor's MIB. The bundled
+> `conf/groovy/formal/` contains example parser scripts generated from standard
+> (IETF) MIB definitions (IF-MIB, SNMPv2-MIB, BGP4-MIB, OSPF-TRAP-MIB, …) with
+> alarm semantics (alertGroup / severity / summary) re-written from public MIB
+> semantics. Vendor-private MIB source files are **not** distributed; only
+> generated, license-clean parser scripts are included.
+
+## Features
+
+- **Groovy-driven parsing** – every trap/event is dispatched to a Groovy parser
+  script; scripts are hot-reloaded by watching the script directory.
+- **Dynamic alarm semantics** – generated scripts set `alertGroup`, `alertKey`,
+  `severity`, `eventType`, `summary`, plus arbitrary dynamic fields, based on
+  MIB field values and conditional chains (e.g. IF-MIB `ifOperStatus ×
+  ifAdminStatus`).
+- **Problem correlation** – domain-scoped problem lifecycle with stale-problem
+  cleanup.
+- **Transport-level deduplication** – Active-Active collector support with
+  fingerprinting.
+- **Flexible event sources** – REST ingest, Kafka consumer (optional), file
+  tailer.
+- **MongoDB persistence** – sole persistence layer (auto index creation).
+
+## Architecture
+
+```
+Raw event (SNMP trap / syslog / HTTP / file / Kafka)
+        │  rawEvent  {source, sourceIp, rawText, metadata{varbinds,…}}
+        ▼
+ScriptRegistry ──loads conf/groovy/formal/*.parser.groovy (hot-reload)──▶ GroovyShell
+        │  matchScript(trapOid) + executeParseScript(rawEvent)
+        ▼
+AlarmEvent (alertGroup, alertKey, severity, eventType, summary,
+            dynamicFields, rawEvent=JSON aggregate of original payload)
+        │
+        ▼
+Problem correlation / dedup / severity-grade hooks (conf/groovy/hooks)
+        ▼
+MongoDB batch writer
+```
+
+### Key components
+
+| Class | Responsibility |
+|-------|----------------|
+| `ScriptRegistry` | Discovers and compiles Groovy scripts from `conf/groovy/formal`, hot-reloads on file change |
+| `EventProcessingChain` | Ingest pipeline: parse raw → correlate → write |
+| `ProblemManager` | Domain-scoped problem lifecycle, stale cleanup |
+| `MongoBatchWriter` | Batched persistence to MongoDB |
+| `RawEvent` / `AlarmEvent` | Input / output event models |
+
+### Raw event preservation
+
+Each parser script aggregates the **complete original event** into
+`event.rawEvent` as JSON:
+
+```json
+{
+  "_source":   "snmp_trap",
+  "_sourceIp": "192.0.2.10",
+  "_trapOid":  "1.3.6.1.6.3.1.1.5.3",
+  "_trapName": "linkDown",
+  "_rawText":  "<original payload>",
+  "_metadata": { "trapName": "linkDown", "varbinds": { "ifIndex": "3", "ifDescr": "eth0" } },
+  "_fields":   { "ifIndex": ["3", "1.3.6.1.2.1.2.2.1.1", "name"] },
+  "_varbinds": { "ifIndex": "3", "ifDescr": "eth0" }
+}
+```
+
+The same structured data is exposed in `event.getDynamicFields()["raw_fields"]`
+for programmatic access without JSON parsing.
+
+## Requirements
+
+- Java 21+
+- Maven 3.8+
+- MongoDB (local or remote)
+
+## Build
+
+```bash
+mvn clean package
+```
+
+Produces a Spring Boot fat jar in `target/`.
+
+## Run
+
+```bash
+# Start MongoDB first (e.g. docker run -p 27017:27017 -d mongo)
+java -jar target/cep-engine-1.0.0-SNAPSHOT.jar --spring.config.location=classpath:application.yml
+```
+
+Default HTTP port: `8080`. Health: `GET /actuator/health`.
+
+### Configuration
+
+`src/main/resources/application.yml` configures MongoDB, Kafka (optional),
+script directory, dedup TTL, and problem lifecycle. All connection settings use
+`localhost` by default; override via environment variables when deploying.
+
+## Contributing
+
+Please read `LICENSE` (Apache-2.0) before contributing. Contributions are
+welcome via pull requests and must follow the Apache-2.0 contribution terms.

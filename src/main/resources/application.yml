@@ -1,0 +1,99 @@
+# ============================================
+# CEP Event Engine - Application Configuration
+# ============================================
+
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: cep-engine
+
+  # MongoDB - sole persistence layer (required for startup)
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/cep
+      database: cep
+      auto-index-creation: true
+
+  # Virtual threads (Java 21)
+  threads:
+    virtual:
+      enabled: true
+
+  # Kafka (optional - disabled by default)
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: cep-engine
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 500
+
+# ============================================
+# CEP Engine Custom Configuration
+# ============================================
+cep:
+  # Groovy script engine
+  groovy:
+    script-dir: ./conf/groovy
+    file-watch:
+      enabled: true
+      debounce-ms: 1000
+
+  # MongoDB batch writer
+  mongo:
+    batch-writer:
+      flush-interval-ms: 500
+
+  # Kafka consumer (optional)
+  kafka:
+    enabled: false
+    topic: cep-raw-events
+    group-id: cep-engine
+    concurrency: 3
+
+  # Domain processing
+  domain:
+    # Stale problem cleanup interval (ms)
+    cleanup-interval-ms: 300000
+    # Problem timeout (ms) - events older than this are considered stale
+    problem-timeout-ms: 86400000
+
+  # Event processing
+  processing:
+    # Max events processed concurrently per domain
+    concurrency-per-domain: 100
+
+  # Transport-level deduplication (Active-Active collector support)
+  transport-dedup:
+    enabled: true
+    # Fingerprint TTL in milliseconds (how long a fingerprint is remembered)
+    ttl-ms: 10000
+    # Cleanup interval for expired fingerprints
+    cleanup-interval-ms: 30000
+
+# ============================================
+# Actuator / Health
+# ============================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# ============================================
+# Logging
+# ============================================
+logging:
+  level:
+    com.raysdata.cep: INFO
+    org.springframework.data.mongodb: WARN
+    org.apache.kafka: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
