@@ -1,5 +1,7 @@
 # CEP Event Engine
 
+> **Language**: [English](README.md) | [简体中文](README.zh-CN.md)
+
 A rule-driven, event-driven network alarm correlation and problem-management
 engine. It receives raw events (SNMP traps, syslog, HTTP, file, Kafka), parses
 them with Groovy scripts, and produces normalized alarms and problems with
