@@ -106,6 +106,35 @@ Default HTTP port: `8080`. Health: `GET /actuator/health`.
 script directory, dedup TTL, and problem lifecycle. All connection settings use
 `localhost` by default; override via environment variables when deploying.
 
+| Key | Default | Description |
+|-----|---------|-------------|
+| `spring.data.mongodb.uri` | `mongodb://localhost:27017/cep` | MongoDB connection |
+| `cep.script.dir` | `classpath:conf/groovy` | Groovy script root (formal + hooks) |
+| `cep.dedup.ttl` | (see yml) | Transport-level dedup window |
+| `cep.problem.stale.*` | (see yml) | Problem stale/cleanup lifecycle |
+| `cep.kafka.*` | disabled | Optional Kafka consumer |
+
+See `src/main/resources/application.yml` for the complete default set.
+
+### Included parser scripts
+
+`conf/groovy/formal/` ships license-clean parser scripts whose alarm semantics
+were re-written from public IETF MIB definitions (no proprietary vendor MIB text
+or third-party rule text is embedded):
+
+- Interface / general: `IF-MIB`, `SNMPv2-MIB`, `ENTITY-MIB`
+- Routing: `BGP4-MIB`, `OSPF-TRAP-MIB`, `ISIS-MIB`, `IPV6-MIB`
+- Bridging/HA: `BRIDGE-MIB`, `VRRP-MIB`, `LLDP-MIB`, `RMON-MIB`
+- MPLS: `MPLS-LSR/LDP/TE/L3VPN/VPN-STD-MIB`
+- OAM & tunnels: `DISMAN-PING/TRACEROUTE-MIB`, `L2TP-MIB`, `FRAME-RELAY-DTE-MIB`
+- Vendor example set: `HUAWEI-*.parser.groovy` (generated from Huawei NE8000
+  MIB trap definitions, semantics re-written from public network-operation
+  knowledge; the vendor MIB source files are not distributed)
+
+> New MIBs are converted to parser scripts with the companion `mib-parser`
+> generator project; add scripts to `conf/groovy/formal/` and they are
+> hot-reloaded automatically.
+
 ## Contributing
 
 Please read `LICENSE` (Apache-2.0) before contributing. Contributions are
