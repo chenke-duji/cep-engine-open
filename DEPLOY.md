@@ -57,9 +57,45 @@ java -jar target/cep-engine-<version>.jar
 ```
 
 - HTTP port: `8080` (override with `SERVER_PORT`)
-- Health check: `GET /actuator/health`
+- Health check: `GET /api/v1/health`
+- Console login: `POST /api/v1/auth/login`
 - Groovy scripts under `conf/groovy/formal/` are **hot-reloaded** when the
   directory changes (no restart needed).
+
+## 5.1 Problem/Resolution pairing & event history
+
+**Event types (`eventType`)**: `1` = Problem, `2` = Resolution (only `2`
+participates in auto-recovery), any other value (including `13`) is not treated
+as a Resolution.
+
+**Pairing key**: `identifier = pairKey + "|" + eventType`, where
+
+```
+pairKey = domainId / agentType / node / alertGroup / alertKey
+```
+
+- `agentType` identifies the ingestion interface (`snmp_trap` / `syslog` / other);
+  blank defaults to `generic`. Events from different interfaces never pair.
+- Same `pairKey` across `eventType=1` (Problem) and `eventType=2` (Resolution)
+  forms the automatic recovery condition. Empty pairKey segments are skipped.
+
+**Flow**: a Resolution event (eventType=2) is matched against the active Problem
+(`pairKey + "|1"`). `resolveProblem` atomically removes it (concurrency-safe),
+sets `status=Cleared` + `severity=0`, and persists both the cleared Problem and
+the Resolution event to `events_current`. After the retention window they are
+moved to `events_history`.
+
+**Event history**: resolved events are kept in `events_current` for the retention
+window, then a scheduled cleaner moves them to `events_history`.
+
+| Env / key | Default | Purpose |
+|-----------|---------|---------|
+| `CEP_MONGO_HISTORY_RETENTION_MS` | 300000 (5 min) | How long a resolved event stays in `events_current` |
+| `CEP_MONGO_HISTORY_CLEANUP_INTERVAL_MS` | 30000 | History sweep interval |
+
+**Authentication**: the management API requires a JWT. The default bootstrap
+admin is `admin` / `admin`; override via `CEP_ADMIN_USER` / `CEP_ADMIN_PASSWORD`
+and set a production JWT secret via `CEP_JWT_SECRET`.
 
 ## 6. Ingest events
 
