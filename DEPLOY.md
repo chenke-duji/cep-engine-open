@@ -37,6 +37,32 @@ The Spring Boot fat jar is produced at `target/cep-engine-<version>.jar`.
 
 ## 4. Configuration
 
+### 4.1 External config file (recommended)
+
+A run-time editable template ships at `config/application.yml`. Place the jar
+and the `config/` directory in the same run directory; Spring Boot loads
+`./config/application.yml` automatically and it **overrides** the defaults
+bundled inside the jar (MongoDB, logging levels, port, auth, history, ops):
+
+```bash
+test-env/
+├── cep-engine-<version>.jar
+└── config/
+    └── application.yml      # edit here; no jar rebuild needed
+
+java -jar cep-engine-<version>.jar
+# or explicitly:
+java -jar cep-engine-<version>.jar --spring.config.additional-location=file:./config/
+```
+
+Key values to adjust in `config/application.yml`:
+- `spring.data.mongodb.uri` / `database` — MongoDB connection
+- `logging.level.com.raysdata.cep` — set `DEBUG` to trace Problem/Resolution pairing
+- `server.port` — HTTP port
+- `cep.security.jwt.secret` / `cep.security.bootstrap-admin.password` — auth
+
+### 4.2 Environment overrides
+
 Edit `src/main/resources/application.yml` or override via environment
 variables. Key settings:
 
