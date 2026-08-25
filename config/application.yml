@@ -1,0 +1,111 @@
+# ============================================================
+# CEP Event Engine - EXTERNAL Runtime Configuration
+# ============================================================
+# Place this file in the ./config directory next to the jar (or set
+# --spring.config.additional-location=file:./config/).
+#
+# Spring Boot loads it automatically and it OVERRIDES the defaults bundled
+# inside the jar (src/main/resources/application.yml). Edit values below for
+# your environment; no jar rebuild is required.
+# ============================================================
+
+# ---- HTTP server ----
+server:
+  port: 8080
+
+# ---- MongoDB (sole persistence layer - required) ----
+spring:
+  data:
+    mongodb:
+      # Test env: point to your MongoDB host, e.g. mongodb://10.0.0.5:27017/cep
+      # Auth: either embed credentials in the URI
+      #   (mongodb://user:pass@host:27017/cep?authSource=admin)
+      # or set username/password/authentication-database below.
+      uri: ${MONGO_URI:mongodb://localhost:27017/cep}
+      database: ${MONGO_DATABASE:cep}
+      username: ${MONGO_USERNAME:}
+      password: ${MONGO_PASSWORD:}
+      # Auth source database (usually "admin"); only needed when username is set.
+      authentication-database: ${MONGO_AUTH_DB:admin}
+      auto-index-creation: true
+
+# ---- Groovy script engine ----
+cep:
+  groovy:
+    # Directory holding *.parser.groovy scripts (hot-reloaded on change).
+    # Relative paths are resolved from the process working directory.
+    script-dir: ./conf/groovy
+    file-watch:
+      enabled: true
+      debounce-ms: 1000
+
+  # ---- MongoDB batch writer ----
+  mongo:
+    batch-writer:
+      # How often buffered events are flushed to MongoDB (ms).
+      flush-interval-ms: 500
+    # ---- Event history ----
+    history:
+      # How long a resolved event (Cleared Problem / Resolution) stays in
+      # events_current before moving to events_history (ms). Default 5 min.
+      retention-ms: 300000
+      # How often the history sweep runs (ms).
+      cleanup-interval-ms: 30000
+
+  # ---- Domain processing ----
+  domain:
+    # Stale problem cleanup interval (ms).
+    cleanup-interval-ms: 300000
+    # Problem timeout (ms) - events older than this are considered stale.
+    problem-timeout-ms: 86400000
+
+  # ---- Event processing ----
+  processing:
+    # Max events processed concurrently per domain.
+    concurrency-per-domain: 100
+
+  # ---- Transport-level deduplication ----
+  transport-dedup:
+    enabled: true
+    # Fingerprint TTL (ms) - how long a fingerprint is remembered.
+    ttl-ms: 10000
+    cleanup-interval-ms: 30000
+
+# ---- Security (console login) ----
+  security:
+    jwt:
+      # JWT signing secret (>= 32 chars). Override via env CEP_JWT_SECRET.
+      secret: ${CEP_JWT_SECRET:cep-engine-please-change-this-secret-key-0123456789abcdef}
+      # Token validity (ms), default 8h.
+      expiration-ms: ${CEP_JWT_EXPIRATION_MS:28800000}
+      issuer: cep-engine
+    bootstrap-admin:
+      username: ${CEP_ADMIN_USER:admin}
+      password: ${CEP_ADMIN_PASSWORD:admin}
+      display-name: Administrator
+
+# ---- Predefined MongoDB update operations (right-click menu) ----
+  operations:
+    - name: ack
+      menuLabel: "确认 (Acknowledge)"
+      confirmMessage: "确认将这些事件标记为已确认 (Acked) ？"
+      collection: events_current
+      update:
+        status: Acked
+    - name: clear
+      menuLabel: "清除 (Clear)"
+      confirmMessage: "确认清除这些事件 (Cleared) ？"
+      collection: events_current
+      update:
+        status: Cleared
+
+# ---- Logging levels ----
+logging:
+  level:
+    # Change to DEBUG to troubleshoot event processing / Problem-Resolution pairing.
+    com.raysdata.cep: INFO
+    # Mongo query logging - set to DEBUG to see executed queries.
+    org.springframework.data.mongodb: WARN
+    org.apache.kafka: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
