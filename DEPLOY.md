@@ -57,6 +57,9 @@ java -jar cep-engine-<version>.jar --spring.config.additional-location=file:./co
 
 Key values to adjust in `config/application.yml`:
 - `spring.data.mongodb.uri` / `database` — MongoDB connection
+- `spring.data.mongodb.username` / `password` / `authentication-database` — MongoDB
+  auth (alternative to embedding credentials in the URI). Overridable via
+  `MONGO_URI` / `MONGO_DATABASE` / `MONGO_USERNAME` / `MONGO_PASSWORD` / `MONGO_AUTH_DB`
 - `logging.level.com.raysdata.cep` — set `DEBUG` to trace Problem/Resolution pairing
 - `server.port` — HTTP port
 - `cep.security.jwt.secret` / `cep.security.bootstrap-admin.password` — auth
