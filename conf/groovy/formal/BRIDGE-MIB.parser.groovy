@@ -1,6 +1,6 @@
 /**
  * Auto-generated from BRIDGE-MIB.mib
- * Generated: 2026-08-21T23:59:19.157528500
+ * Generated: 2026-08-25T16:46:59.132125100
  * Traps/Notifications (2): newRoot, topologyChange
  *
  * Mapping rules:
@@ -141,8 +141,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -209,6 +207,14 @@ if (trapRuleName == "topologyChange") {
     dyn["mcmSysAsciiTimeOfDay"] = varbinds.get("mcmSysAsciiTimeOfDay")
     event.setDynamicFields(dyn)
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

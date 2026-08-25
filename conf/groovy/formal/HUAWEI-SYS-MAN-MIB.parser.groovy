@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-SYS-MAN-MIB.mib
- * Generated: 2026-08-22T01:01:26.101674600
+ * Generated: 2026-08-25T16:47:04.831032
  * Traps/Notifications (94): hwSysWlanApUpgradeBeginNotify, hwSysWlanApUpgradeResultNotify, hwSysWlanApUpgradeUbootNotMatchNotify, hwSysWlanApUpgradeAssistantPackageNotMatchNotify, hwSysClockChangedNotification, hwSysReloadNotification, hwSysMasterHDError, hwSysSlaveHDError, hwPatchErrorTrap, hwPatchActiveOverTimeTrap, hwPatchMalfunctionComebackTrap, hwPatchUpdateTrap, hwPatchInstallFailSlot, hwPatchInstallFailSlotClear, hwPatchPackageError, hwPatchPackageErrorClear, hwSysMasterCfcardError, hwSysSlaveCfcardError, hwSysSlaveSwitchSuccessNotification, hwSysSlaveSwitchFailNotification, hwSysIssuNotification, hwPatchInstallFail, hwPatchInstallFailClear, hwSumUpgradeSuccess, hwSysCfgFileErrorNotification, hwSysImageErrorNotification, hwSysPafChangeNotification, hwSysLicenseChangeNotification, hwSystemBoardExclude, hwSystemBoardExcludeClear, hwEvmVmAbnormalRunNotification, hwEvmVmNotRunningNotification, hwEvmVmAbnormalRestartNotification, hwEvmDownloadFailedNotification, hwEvmInstallFailedNotification, hwTpmStaticMeasureAlarm, hwTpmStaticMeasureAlarmClear, hwSysImageDamagedNotification, hwInnerSSLCertsInvalidEarlyWarning, hwInnerSSLCertsInvalidEarlyWarningResume, hwInnerSSLCertificateInvalid, hwInnerSSLCertificateInvalidResume, hwBoardCommunicationLinkFaultAlarm, hwBoardCommunicationLinkFaultResume, hwOMUSyncFailAlarm, hwOMUSyncFailResume, hwSysPatchDamagedNotification, hwSysPatchDamagedClearNotification, hwSysColdPatchNotEffectNotification, hwSysColdPatchNotEffectClearNotification, hwTpmChipFault, hwTpmChipFaultClear, hwSysPackageVerifyFailed, hwSysImageDamagedResume, hwSysPackageVerifyFailedResume, hwApplicationFault, hwApplicationFaultClear, hwTrustemCertificateExpiredAlarm, hwTrustemCertificateExpiredResume, hwTrustemCertificateExpiredEarlyWarning, hwTrustemCertificateExpiredEarlyResume, hwStartupSecureVersionNeedRefresh, hwStartupSecureVersionNeedRefreshResume, hwSmartUpgradeUserDataRetentionPeriodHasExpired, hwSmartUpgradeUserDataRetentionPeriodHasExpiredResume, hwSysNetconfCfgRecoverFail, hwSecurityRisk, hwSecurityRiskClear, hwPackageOperationSuccess, hwPackageVersionDowngrade, hwPackageOperationFail, hwComponentBackupFail, hwComponentBackupFailResume, hwProcessFaultAlarm, hwProcessFaultAlarmResume, hwOnboardFirmwareDamaged, hwOncardFirmwareDamaged, hwOncardFirmwareDamagedResume, hwBIMMemoryFull, hwBIMMemoryFullResume, hwEulaNotSigned, hwEulaNotSignedResume, hw3rdPluginUpdateFailed, hwBoardRoleAbnormal, hwBoardRoleAbnormalResume, hwHipsAbnormalBehaviorDetected, hwHipsAbnormalBehaviorResolved, hwHipsAbnormalShellDetected, hwHipsFilePrivilegeEscalated, hwHipsKeyfileTampered, hwHipsRootkitAttack, hwHipsUnauthorizedRootUser, hwTimerResThresholdExceed, hwTimerResThresholdExceedResume
  *
  * Mapping rules:
@@ -1053,8 +1053,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -1113,6 +1111,14 @@ if (trapRuleName == "hwSysReloadNotification") {
     event.setSeverity(2)
     event.setEventType("13")
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

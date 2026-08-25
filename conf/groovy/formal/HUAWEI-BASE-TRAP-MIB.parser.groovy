@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-BASE-TRAP-MIB.mib
- * Generated: 2026-08-22T00:56:00.671380600
+ * Generated: 2026-08-25T16:46:59.750002400
  * Traps/Notifications (139): hwEntityRemove, hwEntityInsert, hwEntityUnstable, hwEntityUnstableResume, hwEntityReset, hwEntityResetDone, hwEntityCommunicateError, hwEntityCommunicateResume, hwEntityInvalid, hwEntityResume, hwEntityLeaveMaster, hwEntityBecomeMaster, hwEntityOffline, hwEntityOnline, hwEntityCheckFail, hwEntityCheckResume, hwEntityRegFail, hwEntityRegSuccess, hwEntityDyingGasp, hwEntityBandwidthModeChange, hwCmuAlarm, hwCmuAlarmResume, hwEntityWarning, hwEntityWarningResume, hwTempRisingAlarm, hwTempRisingResume, hwTempFallingAlarm, hwTempFallingResume, hwHumidityRisingAlarm, hwHumidityRisingResume, hwHumidityFallingAlarm, hwHumidityFallingResume, hwVoltRisingAlarm, hwVoltRisingResume, hwVoltFallingAlarm, hwVoltFallingResume, hwCurrentRisingAlarm, hwCurrentRisingResume, hwCurrentFallingAlarm, hwCurrentFallingResume, hwPowerRisingAlarm, hwPowerRisingResume, hwPowerFallingAlarm, hwPowerFallingResume, hwPowerInsufficiencyAlarm, hwPowerInsufficiencyResume, hwAcuSoftwareUpgradeFailure, hwPowerOff, hwPowerOn, hwPowerMixed, hwPowerMixedResume, hwCPUUtilizationRisingAlarm, hwCPUUtilizationResume, hwPortPhysicalDown, hwPortPhysicalUp, hwPortPhysicalNoTrafficAlarm, hwPortPhysicalNoTrafficClear, hwPortPhysicalTrafficRisingAlarm, hwPortPhysicalTrafficClear, hwPortPhysicalCrcErrorRisingAlarm, hwPortPhysicalCrcErrorClear, hwPortPhysicalEthBroadcastRisingAlarm, hwPortPhysicalEthBroadcastClear, hwPortPhysicalEthHalfDuplexAlarm, hwPortPhysicalEthFullDuplexClear, hwPortPhysicalPortTypeChange, hwPortPhysicalAutoNegotiateFail, hwPortPhysicalAutoNegotiateResume, hwStorageUtilizationRisingAlarm, hwStorageUtilizationResume, hwVsDiskFullAlarm, hwVsDiskResume, hwSystemMemoryOverload, hwSystemMemoryOverloadResume, hwFIBOverloadSuspend, hwFIBOverloadSusResume, hwFIBOverloadForward, hwFIBOverloadFwResume, hwFESInconsistencyForMemoryLack, hwFESInconsistencyForMemoryLackResume, hwPppLoopbackDetect, hwPppLoopbackDetResume, hwFlowCongestion, hwFlowCongestionResume, hwDeviceAbnormalRisingAlarm, hwResExhaustBfdAlarm, hwResExhaustBfdResume, hwResExhaustOamAlarm, hwResExhaustOamResume, hwHdlcLoopbackDetect, hwHdlcLoopbackDetResume, hwHdlcIICPacketCrcErr, hwHdlcIICPacketCrcErrResume, hwAutoFtpFailAlarm, hwOpticalPowerAbnormal, hwOpticalPowerResume, hwNpsPatchInstallationFail, hwNpsPatchInstallationResume, hwNpsPatchPacketError, hwNpsPatchPacketResume, hwNpsSysConfigError, hwNpsSysConfigResume, hwNpsInnerSslCertificateInvalidEarlyWarning, hwNpsInnerSslCertificateInvalidEarlyResume, hwNpsInnerSslCertificateInvalidAlarm, hwNpsInnerSslCertificateInvalidResume, hwNpsDiskPartitionUsageExceedingThreshold, hwNpsDiskPartitionUsageExceedingThresholdResume, hwNpsDiskPartitionUnavailable, hwNpsDiskPartitionUnavailableResume, hwNpsDiskPartitionSpaceInsufficient, hwNpsDiskPartitionSpaceInsufficientResume, hwNpsExecutableFilesIncomplete, hwNpsExecutableFilesIncompleteResume, hwNpsSoftwareIntegrityError, hwNpsSoftwareIntegrityResume, hwNpsMasterAdnSlaveSyncFail, hwNpsMasterAdnSlaveSyncResume, hwNpsVirtualMachineDiskInvalid, hwNpsVirtualMachineDiskResume, hwNpsDatabaseRestoreFail, hwNpsSSLCertificateExpired, hwNpsSSLCertificateExpiredEarlyWarning, hwNpsVMResInconsistAlarm, hwNpsVMResInconsistResume, hwNpsVmFauldAlarm, hwNpsVmFauldResume, hwNpsVNFMConnectFault, hwNpsVNFMConnectResume, hwNpsFabricOamPlaneDown, hwNpsFabricOamPlaneDownResume, hwNpsFabricLinkSubhealthy, hwNpsFabricLinkSubhealthyResume, hwNpsDriverTypeMismatch, hwNpsDriverTypeMismatchResume, hwNpsRuCreateFail, hwNpsRuCreateResume, hwNpsIpSecRuleFail, hwNpsIpSecRuleResume
  *
  * Mapping rules:
@@ -1512,8 +1512,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -1924,6 +1922,14 @@ if (trapRuleName == "hwPppLoopbackDetResume") {
     event.setSeverity(1)
     event.setEventType("2")
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

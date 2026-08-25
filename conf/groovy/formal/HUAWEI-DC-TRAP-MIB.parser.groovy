@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-DC-TRAP-MIB.mib
- * Generated: 2026-08-22T00:56:01.463433800
+ * Generated: 2026-08-25T16:47:00.627595500
  * Traps/Notifications (127): hwMPUSynClkFaulty, hwMPUSynClkFaultyResume, hwSlaveMPUNoResp, hwSlaveMPUNoRespResume, hwBrdChannelFaulty, hwBrdChannelFaultyResume, hwBrdNofullin, hwBrdNofullinResume, hwBrdTypeNoMatchReset, hwBrdAutoSwtFail, hwBrdAutoSwt, hwBrdClkLockERR, hwBrdClkLockERRResume, hwBrdRemoved, hwBrdInserted, hwBrdUp, hwClkSrcMiss, hwClkAllSrcLost, hwClkAllSrcLostResume, hwClkFail, hwClkFailResume, hwClkNoHeartbeat, hwClkNoHeartbeatResume, hwLPULostSynAlarm, hwLPUOpenChannelError, hwLPUSlfTstErr, hwLPU3ClkSwitch, hwSFULostHrtReset, hwSFULinkLostReset, hwSFUChannelLinkLost, hwSFUInChannelOpenFail, hwVoltSensorFail, hwVoltSensorFailResume, hwVoltBtmC, hwVoltBtmCResume, hwVoltSprC, hwVoltSprCResume, hwVoltBtmM, hwVoltBtmMResume, hwVoltSprM, hwVoltSprMResume, hwTempSensorFail, hwTempSensorFailResume, hwTempMnr, hwTempMnrResume, hwTempMjr, hwTempMjrResume, hwTempCtl, hwTempCtlResume, hwFanHFail, hwFanFail, hwFanFailResume, hwFanAbsent, hwFanAbsentResume, hwFanCabUN, hwFanCabUNResume, hwPwrFail, hwPwrFailResume, hwPwrAbsent, hwPwrAbsentResume, hwPwrCabUN, hwPwrCabUNResume, hwLCDHFail, hwLCDFail, hwLCDAbsent, hwLCDAbsentResume, hwLCDCabUN, hwLCDCabUNResume, hwROMFail, hwMonitorBUSFail, hwMonitorBUSFailResume, hwBoardOfflineChange, hwWriteFlashError, hwBoardReset, hwBoardResetSuccess, hwSlaveMPUReset, hwMasterSlaveSwap, hwRTCFail, hwExchangeChipFail, hwTempResume, hwOpticalModuleInsert, hwOpticalModuleRemove, hwFPGAAbnormal, hwMinMTunnelDownAlarm, hwMinMTunnelUpAlarm, hwInterfacePhysicalDown, hwInterfacePhysicalUp, hwBTBStartupFileNameDifferent, hwBTBChassisRunningModeConflict, hwBTBCtrlChannelFail, hwBTBCtrlChannelFailResume, hwBTBDataChannelFail, hwBTBDataChannelFailResume, hwBTBClkChannelFail, hwBTBClkChannelFailResume, hwBTBSFUOpticInterfaceError, hwBTBSFUOpticInterfaceErrorResume, hwBTBVSRInterfaceInvalid, hwBTBVSRInterfaceInvalidResume, hwBTBSlaveChassisNoHeart, hwBTBNoSlaveChassis, hwBTBSlaveChassisRegisted, hwBTBSlaveChassisRegisteFail, hwBTBChassisTypeConflict, hwSuperChangeSuccesful, hwSuperChangeFailure, hwOpticaPowerAbnormal, hwEpldAbnormal, hwPhyChipAbnormal, hwSerdesAbnormal, hwBoardAbnormal, hwFeChannelAbnormal, hwParityCheckAbnormal, hwPhyClockAbnormal, hwPortAutoNegotiateFail, hwPortSemiduplex, hwScuStartModeSetFail, hwMemoryExhaust, hwMemoryExhaustClear, hwMethAbnormal, hwLpuNotTight, hwLicenseFail, hwHaBatchBegin, hwHaBatchEnd, hwHaSmoothBegin, hwHaSmoothEnd, hwFanUp
  *
  * Mapping rules:
@@ -1389,8 +1389,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -2204,6 +2202,14 @@ if (trapRuleName == "hwFanAbsent") {
     dyn["entPhysicalIndex"] = varbinds.get("entPhysicalIndex")
     event.setDynamicFields(dyn)
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

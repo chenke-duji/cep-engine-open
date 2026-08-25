@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-DEVICE-MIB.mib
- * Generated: 2026-08-22T00:56:01.587759800
+ * Generated: 2026-08-25T16:47:00.771682500
  * Traps/Notifications (145): hwDevBoardDetectTrap, hwDevBoardDisappearedTrap, hwDevBoardStateChangedTrap, hwDevBoardStaChgOffLineTrap, hwDevBoardAutoLoadTrap, hwDevUserlabelChangeTrap, hwDevSystemStateChangeTrap, hwDevFrameDetectTrap, hwDevFrameDisappearedTrap, hwDevFrameStateChangeTrap, hwDevExtendedFramePortChangeTrap, hwDevSnmpProbeRecordTrap, hwDevStackFrameStateChangeTrap, hwDevSystemDataSynCancelTrap, hwDevActiveStandbyContolBoardInconsistentTrap, hwDevActiveStandbyDataSynCancelTrap, hwDevActiveStandbyDataSynCancelRecoverTrap, hwDevSystemPoweroffTrap, hwDevSystemAutoDeployFailTrap, hwDevSystemDeviceNameChangeTrap, hwDevFrameTypeInconsistentTrap, hwDevFrameRestoreTrap, hwDevFrameFaultTrap, hwDevExtendedFrameTypeInconsistentTrap, hwDevExtendedFrameDyingGaspAlarmTrap, hwDevExtendedFrameDyingGaspRestoreTrap, hwDevFrameIdOverLoadTrap, hwDevFrameCmtsAntitheftAuthFailTrap, hwDevFrameCmtsAntitheftAuthRestoreTrap, hwVccDataLinkFault, hwVccDataLinkFaultResume, hwVccDataChannelFault, hwVccDataChannelFaultResume, hwDevStackFrameFaultTrap, hwDevStackFrameRestoreTrap, hwDevStandbyFrameTypeInconsistentTrap, hwDeviceHighTemperatureMinorFaultTrap, hwDeviceHighTemperatureMinorRestoreTrap, hwDeviceHighTemperatureMajorFaultTrap, hwDeviceHighTemperatureMajorRestoreTrap, hwDeviceHighTemperatureCriticalFaultTrap, hwDeviceHighTemperatureCriticalRestoreTrap, hwFwdChannelFault, hwFwdChannelFaultResume, hwDevTlsCertifyFailTrap, hwDevTlsCertifyRestoreTrap, hwDevExtendedFrameRestoreTrap, hwDevExtendedFrameFaultTrap, hwDevFramePacketLossFaultTrap, hwDevFramePacketLossRestoreTrap, hwDevFrameDustAccumulationRiskFaultTrap, hwDevFrameDustAccumulationRiskRestoreTrap, hwDevBoardMisMatchTrap, hwDevBoardFaultTrap, hwDevBoardRestoreTrap, hwDevBoardReplacedTrap, hwDevBoardEnterTemperatureProctectModeTrap, hwDevBoardExitTemperatureProctectModeTrap, hwDevBoardTemperatureTooHighTrap, hwDevBoardTemperatureTooHighRecoverTrap, hwDevBoardTemperatureTooLowTrap, hwDevBoardTemperatureTooLowRecoverTrap, hwDevPowerInputFaultTrap, hwDevPowerInputRecoverTrap, hwDevBoardOnlineStateTrap, hwDevBoardPower5VFaultTrap, hwDevBoardPower5VResumeTrap, hwDevStorageFaultTrap, hwDevStorageFaultRestoreTrap, hwFtpConfigureTrap, hwDevBoardAutomaticExpandFailTrap, hwDevBoardAutomaticExpandRestoreTrap, hwDevBoardInputFaultTrap, hwDevBoardInputRecoverTrap, hwDevPowerLackVoltageFaultTrap, hwDevPowerLackVolitageRecoverTrap, hwDevBoardReplaceFailTrap, hwDevPowerPortInputFaultTrap, hwDevPowerPortInputRecoverTrap, hwDevPowerPortInputUnderVolFaultTrap, hwDevPowerPortInputUnderVolRecoverTrap, hwDevImportantFileBrokenTrap, hwDevImportantFileBrokenRestoreTrap, hwDevRtuLicCapacityExceedFaultTrap, hwDevRtuLicCapacityExceedRestoreTrap, hwDevExBiosPasswordFaultTrap, hwDevExBiosPasswordRecoverTrap, hwDevLoadLowerVersionTrap, hwDevPowerOverThresholdFaultTrap, hwDevPowerOverThresholdRestoreTrap, hwDevBoardIsolatedTrap, hwDevBoardIsolatedRecoverTrap, hwDevSeIsolatedTrap, hwDevSeIsolatedTrapRestore, hwDevVoiceFileLZMATrap, hwDevFileIntegrityCheckFailedTrap, hwDevFileIntegrityCheckSuccessTrap, hwDevBoardAddConfigReplaceSuccessTrap, hwDevBoardAddConfigReplaceFailTrap, hwUnauthDistributionFaultTrap, hwUnauthDistributionRestoreTrap, hwDevPowerPortInputOverVolFaultTrap, hwDevPowerPortInputOverVolRecoverTrap, hwClkInputSignalNotMatchConfigurationTrap, hwClkInputSignalRecoverMatchConfigurationTrap, hwDevUbifsFaultTrap, hwDevUbifsRestoreTrap, hwDevBoardHotResetTrap, hwDevMemFragmentationExcessiveFaultTrap, hwDevMemFragmentationExcessiveRestoreTrap, hwDevBoardSoftWareMisMatchTrap, hwDevPowerBoardCapInconsistencyFaultTrap, hwDevPowerBoardCapInconsistencyRestoreTrap, hwDevBoardCriticalHardFaultTrap, hwDevBoardCriticalHardRestoreTrap, hwDevBoardMinorHardFaultTrap, hwDevBoardMinorHardRestoreTrap, hwDevAreaPowerOverThresholdFaultTrap, hwDevAreaPowerOverThresholdRestoreTrap, hwDevRtuResOverloadFaultTrap, hwDevRtuResOverloadRestoreTrap, hwDevTactSwitchOpenFaultTrap, hwDevTactSwitchOpenRestoreTrap, hwDevEmergencyPartitionTrap, hwDevEmergencyPartitionRestoreTrap, hwDevSubBoardTypeInconsistentTrap, hwDevSubBoardMisMatchTrap, hwDevSubBoardReplacedTrap, hwDevSubBoardTemperatureTooHighTrap, hwDevSubBoardTemperatureTooHighRecoverTrap, hwDevSubBoardFaultTrap, hwDevSubBoardFaultRecoverTrap, hwDevSubBoardActStdInconsistentTrap, hwDevSubBoardActStdInconsistentRestoreTrap, hwDiagResOverloadFaultTrap, hwDiagResOverloadRestoreTrap, hwFrameAdminResultTrap, hwSlotAdminResultTrap, hwSubSlotAdminResultTrap, hwPortAdminResultTrap, hwDevAntiTheftLockTraps, hwDevAntiTheftUnAuthTraps, hwDevAntiTheftUnAuthResumeTraps, hwDevAntiTheftLockedTraps, hwDevAntiTheftLockedResumeTraps
  *
  * Mapping rules:
@@ -1571,8 +1571,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -2113,6 +2111,14 @@ if (trapRuleName == "hwPortAdminResultTrap") {
         event.setEventType("1")
     }
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

@@ -1,6 +1,6 @@
 /**
  * Auto-generated from BGP4-MIB.mib
- * Generated: 2026-08-21T23:59:19.120527400
+ * Generated: 2026-08-25T16:46:59.087652400
  * Traps/Notifications (4): bgpEstablishedNotification, bgpBackwardTransNotification, bgpEstablished, bgpBackwardTransition
  *
  * Mapping rules:
@@ -163,8 +163,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -200,110 +198,14 @@ event.setOriginalSummary(event.getSummary())
 // --- Trap rule overrides (alert group / severity) ---
 def trapRuleName = trapInfo.name
 def agent = ""
-// --- Trap: bgpEstablishedNotification (OID 1.3.6.1.2.1.15.0.1) ---
-// BGP FSM enters the established state. Field order: gf[1]=bgpPeerRemoteAddr, gf[2]=bgpPeerLastError, gf[3]=bgpPeerState
-if (trapRuleName == "bgpEstablishedNotification") {
-    event.setAlertGroup("BGP Peer Status")
-    def alertKey = "bgpPeerEntry." + gf[1]
-    event.setAlertKey(alertKey)
-    def summary = "BGP Peer Established (peer " + gf[1] + ")"
-    event.setSummary(summary)
-    // bgpPeerState: 1=idle,2=connect,3=active,4=opensent,5=openconfirm,6=established
-    if (gf[3] == "6") {
-        event.setSeverity(1)
-        event.setEventType("2")
-    }
-    else if (gf[3] == "1") {
-        event.setSeverity(4)
-        event.setEventType("1")
-    }
-    else {
-        event.setSeverity(2)
-        event.setEventType("1")
-    }
-    def dyn = event.getDynamicFields() ?: [:]
-    dyn["bgpPeerRemoteAddr"] = varbinds.get("bgpPeerRemoteAddr")
-    dyn["bgpPeerLastError"] = varbinds.get("bgpPeerLastError")
-    dyn["bgpPeerState"] = varbinds.get("bgpPeerState")
-    event.setDynamicFields(dyn)
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
 }
-// --- Trap: bgpBackwardTransNotification (OID 1.3.6.1.2.1.15.0.2) ---
-// BGP FSM moves from a higher to a lower numbered state. Field order: gf[1]=bgpPeerRemoteAddr, gf[2]=bgpPeerLastError, gf[3]=bgpPeerState
-if (trapRuleName == "bgpBackwardTransNotification") {
-    event.setAlertGroup("BGP Peer Status")
-    def alertKey = "bgpPeerEntry." + gf[1]
-    event.setAlertKey(alertKey)
-    def summary = "BGP Peer Down (peer " + gf[1] + ")"
-    event.setSummary(summary)
-    // A backward transition indicates a dropped/regressed BGP session, raise severity.
-    if (gf[3] == "6") {
-        event.setSeverity(2)
-        event.setEventType("1")
-    }
-    else if (gf[3] == "1") {
-        event.setSeverity(4)
-        event.setEventType("1")
-    }
-    else {
-        event.setSeverity(3)
-        event.setEventType("1")
-    }
-    def dyn = event.getDynamicFields() ?: [:]
-    dyn["bgpPeerRemoteAddr"] = varbinds.get("bgpPeerRemoteAddr")
-    dyn["bgpPeerLastError"] = varbinds.get("bgpPeerLastError")
-    dyn["bgpPeerState"] = varbinds.get("bgpPeerState")
-    event.setDynamicFields(dyn)
-}
-// --- Trap: bgpEstablished (OID 1.3.6.1.2.1.15.7.1) ---
-// Legacy BGP Established event. Field order: gf[1]=bgpPeerLastError, gf[2]=bgpPeerState
-if (trapRuleName == "bgpEstablished") {
-    event.setAlertGroup("BGP Peer Status")
-    def alertKey = "bgpPeerEntry"
-    event.setAlertKey(alertKey)
-    def summary = "BGP Peer Established"
-    event.setSummary(summary)
-    if (gf[2] == "6") {
-        event.setSeverity(1)
-        event.setEventType("2")
-    }
-    else if (gf[2] == "1") {
-        event.setSeverity(4)
-        event.setEventType("1")
-    }
-    else {
-        event.setSeverity(2)
-        event.setEventType("1")
-    }
-    def dyn = event.getDynamicFields() ?: [:]
-    dyn["bgpPeerLastError"] = varbinds.get("bgpPeerLastError")
-    dyn["bgpPeerState"] = varbinds.get("bgpPeerState")
-    event.setDynamicFields(dyn)
-}
-// --- Trap: bgpBackwardTransition (OID 1.3.6.1.2.1.15.7.2) ---
-// Legacy BGP BackwardTransition event (FSM moves to a lower state). Field order: gf[1]=bgpPeerLastError, gf[2]=bgpPeerState
-if (trapRuleName == "bgpBackwardTransition") {
-    event.setAlertGroup("BGP Peer Status")
-    def alertKey = "bgpPeerEntry"
-    event.setAlertKey(alertKey)
-    def summary = "BGP Peer Down"
-    event.setSummary(summary)
-    if (gf[2] == "6") {
-        event.setSeverity(2)
-        event.setEventType("1")
-    }
-    else if (gf[2] == "1") {
-        event.setSeverity(4)
-        event.setEventType("1")
-    }
-    else {
-        event.setSeverity(3)
-        event.setEventType("1")
-    }
-    def dyn = event.getDynamicFields() ?: [:]
-    dyn["bgpPeerLastError"] = varbinds.get("bgpPeerLastError")
-    dyn["bgpPeerState"] = varbinds.get("bgpPeerState")
-    event.setDynamicFields(dyn)
-}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

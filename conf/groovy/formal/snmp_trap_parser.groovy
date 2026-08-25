@@ -81,9 +81,21 @@ if (metadata != null) {
 // Set domain (from metadata or default)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
 
-// Build unique identifier: domainId + node + alertKey + eventType
-def identParts = [event.getDomainId(), event.getNode(), event.getAlertKey(), event.getEventType()]
-event.setIdentifier(identParts.findAll { it != null && it != "" }.join("|"))
+// agentType identifies the ingestion interface (snmp_trap / syslog / ...).
+// Blank defaults to "generic" so pairing stays deterministic across interfaces.
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType("generic")
+}
+
+// Build unique identifier = pairKey + "|" + eventType.
+// pairKey = domainId/agentType/node/alertGroup/alertKey (empty segments skipped).
+// Events sharing the same pairKey across eventType 1 (Problem) and 2 (Resolution)
+// form the automatic recovery condition.
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(),
+               event.getAlertGroup(), event.getAlertKey()]
+        .findAll { it != null && it.toString().trim() != "" }
+        .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // Set original severity for audit
 event.setOriginalSeverity(event.getSeverity())

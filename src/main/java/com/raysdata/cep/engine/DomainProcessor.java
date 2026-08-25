@@ -134,31 +134,85 @@ public class DomainProcessor {
 
     /**
      * Resolve a Problem event by matching it with a Resolution.
-     * Returns the resolved Problem event, or null if no match found.
+     * <p>
+     * The <code>problemIdentifier</code> is the full identifier of the Problem
+     * event (pairKey + "|" + PROBLEM.code). The Problem is atomically removed
+     * from active events (concurrency-safe), marked Cleared with severity 0,
+     * and queued to persist to the current collection (it stays there until a
+     * scheduled task moves it to the history collection after the retention
+     * window). The Resolution event is also queued to persist.
+     * <p>
+     * Returns the resolved Problem event, or null if no match was found.
      */
-    public AlarmEvent resolveProblem(String pairKey, AlarmEvent resolution) {
-        AlarmEvent problem = activeEvents.get(pairKey);
+    public AlarmEvent resolveProblem(String problemIdentifier, AlarmEvent resolution) {
+        // Atomically remove; ConcurrentHashMap.remove returns the value only if
+        // present and removed exactly once, making concurrent Resolution events
+        // for the same Problem safe (only the first wins).
+        AlarmEvent problem = activeEvents.remove(problemIdentifier);
         if (problem == null) {
+            log.debug("No active problem for resolution {} (identifier={})",
+                    resolution.getIdentifier(), problemIdentifier);
             return null;
         }
 
-        // Mark the problem as resolved
+        long now = System.currentTimeMillis();
+
+        // Mark the problem as resolved. status=Cleared is consistent with severity=0.
         problem.setEventType(EventType.RESOLUTION.getCode());
-        problem.setStatus("CLOSED");
-        problem.setClearTime(String.valueOf(System.currentTimeMillis()));
-        problem.setRecoveryTime(System.currentTimeMillis());
+        problem.setStatus("Cleared");
+        problem.setClearTime(String.valueOf(now));
+        problem.setRecoveryTime(now);
         problem.setSeverity(0);  // Clear severity
 
-        // Remove from active events
-        activeEvents.remove(pairKey);
-
-        // Queue for upsert (update the existing record in DB)
+        // Queue the resolved Problem for upsert (stays in events_current until
+        // the scheduled cleanup moves it to events_history after retention).
         synchronized (pendingUpserts) {
             pendingUpserts.add(problem);
+            // Persist the Resolution event too (per requirement #4). Its
+            // recoveryTime is set so history retention is measured from now.
+            if (resolution != null) {
+                if (resolution.getRecoveryTime() <= 0) {
+                    resolution.setRecoveryTime(now);
+                }
+                pendingUpserts.add(resolution);
+            }
         }
 
-        log.debug("Resolved problem: {} with resolution from: {}", pairKey, resolution.getIdentifier());
+        log.info("Resolved problem {} with resolution from {}", problemIdentifier,
+                resolution != null ? resolution.getIdentifier() : "n/a");
         return problem;
+    }
+
+    /**
+     * Build the pairing key (without the trailing eventType segment) that must
+     * be identical for a Problem and its Resolution to auto-recover.
+     * <p>
+     * Fields (empty ones are skipped): domainId, agentType, node, alertGroup,
+     * alertKey. Same pairKey across eventType 1 (Problem) and 2 (Resolution)
+     * forms the automatic recovery condition.
+     *
+     * @param domainId   domain id (may be null -> skipped)
+     * @param agentType  agent type (null/blank -> default "generic")
+     * @param node       node (may be null -> skipped)
+     * @param alertGroup alert group (may be null -> skipped)
+     * @param alertKey   alert key (may be null -> skipped)
+     */
+    public static String buildPairKey(String domainId, String agentType, String node,
+                                      String alertGroup, String alertKey) {
+        String at = (agentType == null || agentType.isBlank()) ? "generic" : agentType.trim();
+        StringBuilder sb = new StringBuilder(64);
+        appendSegment(sb, domainId);
+        appendSegment(sb, at);
+        appendSegment(sb, node);
+        appendSegment(sb, alertGroup);
+        appendSegment(sb, alertKey);
+        return sb.toString();
+    }
+
+    private static void appendSegment(StringBuilder sb, String value) {
+        if (value == null || value.isBlank()) return;
+        if (sb.length() > 0) sb.append('|');
+        sb.append(value.trim());
     }
 
     /**

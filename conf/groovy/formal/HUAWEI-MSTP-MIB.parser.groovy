@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-MSTP-MIB.mib
- * Generated: 2026-08-22T00:56:03.973125400
+ * Generated: 2026-08-25T16:47:03.371526900
  * Traps/Notifications (38): hwMstpiPortStateForwarding, hwMstpiPortStateDiscarding, hwMstpiBridgeLostRootPrimary, hwMstpiPortRootGuarded, hwMstpiPortBpduGuarded, hwMstpiPortLoopGuarded, hwMstpiEdgePortChanged, hwMstpProPortStateForwarding, hwMstpProPortStateDiscarding, hwMstpProBridgeLostRootPrimary, hwMstpProPortRootGuarded, hwMstpProPortBpduGuarded, hwMstpProPortLoopGuarded, hwMstpProEdgePortChanged, hwMstpiTcGuarded, hwMstpProTcGuarded, hwMstpProRootChanged, hwMstpProNewPortStateForwarding, hwMstpProNewPortStateDiscarding, hwMstpProNewBridgeLostRootPrimary, hwMstpProNewPortRootGuarded, hwMstpProNewPortBpduGuarded, hwMstpProNewPortLoopGuarded, hwMstpProNewEdgePortChanged, hwMstpProLoopbackDetected, hwMstpPortCountExceedThreshold, hwMstpPortCountExceedThresholdResume, hwMstpProRootLost, hwMstpProRootResume, hwMstpProRootShake, hwMstpProRootShakeResume, hwMstpProTcFlap, hwMstpProTcFlapResume, hwMstpProRcvTcFlap, hwMstpProLoopDetectedRising, hwMstpProLoopDetectedResume, hwMstpVstpMacDiffRising, hwMstpVstpMacDiffResume
  *
  * Mapping rules:
@@ -503,8 +503,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -622,6 +620,14 @@ if (trapRuleName == "hwMstpiPortLoopGuarded") {
     dyn["hwMstpiPortIndex"] = varbinds.get("hwMstpiPortIndex")
     event.setDynamicFields(dyn)
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

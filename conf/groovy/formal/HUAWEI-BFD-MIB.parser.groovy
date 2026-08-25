@@ -1,6 +1,6 @@
 /**
  * Auto-generated from HUAWEI-BFD-MIB.mib
- * Generated: 2026-08-22T00:05:42.996756300
+ * Generated: 2026-08-25T16:46:59.834820300
  * Traps/Notifications (31): hwBfdSessDown, hwBfdSessUp, hwBfdSessReachLimit, hwBfdSessReachLimitBindIf, hwBfdSessReachLimitResume, hwBfdSessReachLimitBindIfResume, hwBfdSessCfgRemoteFail, hwBfdSessFaultDown, hwBfdSessResume, hwBfdSessApOperFailed, hwBfdSessFsmDiscordant, hwBfdSessFsmAccordant, hwBfdIPv6SessDown, hwBfdIPv6SessUp, hwBfdBitErrorDetectSessReachLimit, hwBfdSessReachTotalLimit, hwBfdSessReachTotalLimitResume, hwBfdSessCreateFail, hwBfdSessCreateFailResume, hwBfdSliceAlarm, hwBfdSliceAlarmResume, hwBfdSelectBoardWarn, hwBfdSelectBoardWarnResume, hwBfdSessUpTrap, hwBfdSessDownTrap, hwBfdv6SingleHopSessUpTrap, hwBfdv6SingleHopSessDownTrap, hwBfdv6MultiHopSessUpTrap, hwBfdv6MultiHopSessDownTrap, hwBfdPWSessUp, hwBfdPWSessDown
  *
  * Mapping rules:
@@ -433,8 +433,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -517,6 +515,14 @@ if (trapRuleName == "hwBfdSessReachLimitBindIf") {
     dyn["hwBfdSessInterfaceLimitNumber"] = varbinds.get("hwBfdSessInterfaceLimitNumber")
     event.setDynamicFields(dyn)
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

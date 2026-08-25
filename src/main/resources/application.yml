@@ -47,6 +47,13 @@ cep:
   mongo:
     batch-writer:
       flush-interval-ms: 500
+    # Event history: resolved events (Cleared Problems / Resolution) are kept
+    # in events_current for the retention window, then moved to events_history.
+    history:
+      # How long a resolved event stays in events_current before moving to history (ms).
+      retention-ms: 300000
+      # How often the cleanup task scans for events to move to history (ms).
+      cleanup-interval-ms: 30000
 
   # Kafka consumer (optional)
   kafka:

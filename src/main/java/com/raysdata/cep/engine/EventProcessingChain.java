@@ -114,6 +114,9 @@ public class EventProcessingChain {
             dp.incrementFlash(event.getIdentifier());
 
             // Step 4: problem_resolution hook
+            // The hook returns the Problem's full identifier (pairKey + "|" + PROBLEM.code)
+            // when a matching Problem is found. resolveProblem atomically resolves it,
+            // persists the cleared Problem and the Resolution event to events_current.
             HookResult prResult = invokeHook("problem_resolution", event, dp);
             if (prResult.getAction() == ResultAction.MATCH && prResult.getPairKey() != null) {
                 dp.resolveProblem(prResult.getPairKey(), event);

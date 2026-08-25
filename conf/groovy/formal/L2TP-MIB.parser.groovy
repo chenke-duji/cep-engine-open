@@ -1,6 +1,6 @@
 /**
  * Auto-generated from L2TP-MIB.mib
- * Generated: 2026-08-21T23:59:27.098102300
+ * Generated: 2026-08-25T16:47:06.084819400
  * Traps/Notifications (1): l2tpTunnelAuthFailure
  *
  * Mapping rules:
@@ -133,8 +133,6 @@ dbg("  summary        = " + event.getSummary())
 event.setSeverity(Severity.MINOR.level)
 event.setEventType(EventType.PROBLEM.code)
 event.setDomainId(metadata?.get("domainId")?.toString() ?: "default")
-event.setIdentifier([event.getDomainId(), event.getNode(), trapInfo.name, event.getEventType()]
-                    .findAll { it != null && it != "" }.join("|"))
 event.setFirstOccurrence(System.currentTimeMillis())
 event.setLastOccurrence(System.currentTimeMillis())
 event.setRawEvent(rawEvent.getRawEvent())
@@ -185,6 +183,14 @@ if (trapRuleName == "l2tpTunnelAuthFailure") {
     dyn["l2tpTunnelConfigIfIndex"] = varbinds.get("l2tpTunnelConfigIfIndex")
     event.setDynamicFields(dyn)
 }
+
+if (event.getAgentType() == null || event.getAgentType().trim().isEmpty()) {
+    event.setAgentType(metadata?.get("agentType")?.toString() ?: "generic")
+}
+def pairKey = [event.getDomainId(), event.getAgentType(), event.getNode(), event.getAlertGroup(), event.getAlertKey()]
+                    .findAll { it != null && it.toString().trim() != "" }
+                    .collect { it.toString().trim() }.join("|")
+event.setIdentifier(pairKey + "|" + event.getEventType())
 
 // --- Stage 4: Final event output ---
 dbg("--- Final Event ---")

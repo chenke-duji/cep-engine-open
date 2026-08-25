@@ -189,6 +189,81 @@ public class MongoBatchWriter {
         }
     }
 
+    // --- Event history (events_history) ---
+
+    /** History collection for resolved/closed events. */
+    public static final String HISTORY_COLLECTION = "events_history";
+
+    /**
+     * Move resolved events (Problem marked Cleared, or Resolution events) from
+     * the current collection into the history collection once they are older
+     * than the retention window.
+     * <p>
+     * Runs on a schedule; cutoffMs is the earliest allowed "lastOccurrence"
+     * for an event to remain in the current (active) collection. Any event that
+     * is resolved (status=Cleared or eventType=Resolution) and older than the
+     * cutoff is moved to events_history.
+     *
+     * @param cutoffMs timestamp in ms; events with lastOccurrence < cutoff are eligible
+     * @return number of events moved to history
+     */
+    public int moveResolvedToHistory(long cutoffMs) {
+        // Resolved events = status "Cleared" OR eventType Resolution("2")
+        Criteria resolved = new Criteria().orOperator(
+                Criteria.where("status").is("Cleared"),
+                Criteria.where("eventType").is(com.raysdata.cep.model.EventType.RESOLUTION.getCode())
+        );
+        // Retention measured from recoveryTime when set (>0), otherwise from
+        // lastOccurrence. recoveryTime>0 && recoveryTime<cutoff, OR
+        // (recoveryTime<=0 || missing) && lastOccurrence<cutoff.
+        Criteria older = new Criteria().orOperator(
+                new Criteria().andOperator(
+                        Criteria.where("recoveryTime").gt(0),
+                        Criteria.where("recoveryTime").lt(cutoffMs)
+                ),
+                new Criteria().andOperator(
+                        new Criteria().orOperator(
+                                Criteria.where("recoveryTime").lte(0),
+                                Criteria.where("recoveryTime").exists(false)
+                        ),
+                        Criteria.where("lastOccurrence").lt(cutoffMs)
+                )
+        );
+        Query query = new Query();
+        query.addCriteria(resolved);
+        query.addCriteria(older);
+
+        List<AlarmEvent> eligible = mongoTemplate.find(query, AlarmEvent.class, "events_current");
+        int moved = 0;
+        for (AlarmEvent event : eligible) {
+            if (moveToHistory(event)) {
+                moved++;
+            }
+        }
+        if (moved > 0) {
+            log.info("Moved {} resolved events to {}", moved, HISTORY_COLLECTION);
+        }
+        return moved;
+    }
+
+    /**
+     * Move a single event from events_current to events_history (insert into
+     * history, then delete from current). Returns true on success.
+     */
+    public boolean moveToHistory(AlarmEvent event) {
+        try {
+            mongoTemplate.insert(event, HISTORY_COLLECTION);
+            mongoTemplate.remove(
+                    Query.query(Criteria.where("identifier").is(event.getIdentifier())),
+                    "events_current");
+            log.debug("Moved event {} to {}", event.getIdentifier(), HISTORY_COLLECTION);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to move event {} to history", event.getIdentifier(), e);
+            return false;
+        }
+    }
+
     // --- Internal ---
 
     private void singleUpsert(AlarmEvent event, String collectionName) {
