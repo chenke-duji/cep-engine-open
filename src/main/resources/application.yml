@@ -11,10 +11,16 @@ spring:
     name: cep-engine
 
   # MongoDB - sole persistence layer (required for startup)
+  # Auth can be provided either in the URI (mongodb://user:pass@host/db?authSource=admin)
+  # or via the username/password/authentication-database fields below.
   data:
     mongodb:
-      uri: mongodb://localhost:27017/cep
-      database: cep
+      uri: ${MONGO_URI:mongodb://localhost:27017/cep}
+      database: ${MONGO_DATABASE:cep}
+      username: ${MONGO_USERNAME:}
+      password: ${MONGO_PASSWORD:}
+      # Auth source database (usually "admin"); only needed when username is set.
+      authentication-database: ${MONGO_AUTH_DB:admin}
       auto-index-creation: true
 
   # Virtual threads (Java 21)
