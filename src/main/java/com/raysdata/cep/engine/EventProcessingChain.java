@@ -28,7 +28,7 @@ import com.google.gson.JsonParser;
  *   <li>maintain_check hook: check maintenance windows (Groovy)</li>
  *   <li>flash_detect hook: flash detection (Groovy)</li>
  *   <li>problem_resolution hook: Problem/Resolution pairing (Groovy)</li>
- *   <li>Dedup: frequency count and severity upgrade (Java)</li>
+ *   <li>Dedup: tally count and severity upgrade (Java)</li>
  *   <li>Queue for batch upsert to MongoDB</li>
  * </ol>
  * <p>

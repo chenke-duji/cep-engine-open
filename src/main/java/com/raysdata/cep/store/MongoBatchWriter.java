@@ -108,6 +108,87 @@ public class MongoBatchWriter {
         return mongoTemplate.findAll(AlarmEvent.class, collectionName);
     }
 
+    /**
+     * Paged query over the current events collection.
+     *
+     * @param collectionName collection to query (e.g. events_current)
+     * @param criteria       query criteria (may be empty to match all)
+     * @param page           1-based page number
+     * @param size           page size
+     * @param sortBy         field to sort by (optional)
+     * @param sortDesc       true for descending sort
+     * @return a paged result containing the total count and the page items
+     */
+    public PagedResult<AlarmEvent> findPaged(String collectionName, Criteria criteria,
+                                             int page, int size,
+                                             String sortBy, boolean sortDesc) {
+        return findPaged(collectionName, Query.query(criteria), page, size, sortBy, sortDesc);
+    }
+
+    /**
+     * Paged query over the current events collection using a full Query, which
+     * supports arbitrary user-supplied MongoDB filter documents.
+     *
+     * @param collectionName collection to query (e.g. events_current)
+     * @param baseQuery      the query to run (filter document; paging/sort added here)
+     * @param page           1-based page number
+     * @param size           page size
+     * @param sortBy         field to sort by (optional)
+     * @param sortDesc       true for descending sort
+     * @return a paged result containing the total count and the page items
+     */
+    public PagedResult<AlarmEvent> findPaged(String collectionName, Query baseQuery,
+                                             int page, int size,
+                                             String sortBy, boolean sortDesc) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 1000);
+
+        long total = mongoTemplate.count(baseQuery, collectionName);
+
+        Query pageQuery = new Query();
+        pageQuery.getQueryObject().putAll(baseQuery.getQueryObject());
+        pageQuery.skip((long) (safePage - 1) * safeSize).limit(safeSize);
+        if (sortBy != null && !sortBy.isBlank()) {
+            pageQuery.with(org.springframework.data.domain.Sort.by(
+                    sortDesc ? org.springframework.data.domain.Sort.Direction.DESC
+                             : org.springframework.data.domain.Sort.Direction.ASC,
+                    sortBy));
+        }
+        List<AlarmEvent> items = mongoTemplate.find(pageQuery, AlarmEvent.class, collectionName);
+        return new PagedResult<>(items, total, safePage, safeSize);
+    }
+
+    /** Simple paged result container. */
+    public static class PagedResult<T> {
+        private final List<T> items;
+        private final long total;
+        private final int page;
+        private final int size;
+
+        public PagedResult(List<T> items, long total, int page, int size) {
+            this.items = items;
+            this.total = total;
+            this.page = page;
+            this.size = size;
+        }
+
+        public List<T> getItems() {
+            return items;
+        }
+
+        public long getTotal() {
+            return total;
+        }
+
+        public int getPage() {
+            return page;
+        }
+
+        public int getSize() {
+            return size;
+        }
+    }
+
     // --- Internal ---
 
     private void singleUpsert(AlarmEvent event, String collectionName) {
@@ -122,7 +203,6 @@ public class MongoBatchWriter {
         return "events_current";
     }
 
-    @SuppressWarnings("unchecked")
     private Update buildUpdate(AlarmEvent event) {
         Update update = new Update();
         update.set("identifier", event.getIdentifier());
@@ -131,7 +211,7 @@ public class MongoBatchWriter {
         update.set("severity", event.getSeverity());
         update.set("originalSeverity", event.getOriginalSeverity());
         update.set("summary", event.getSummary());
-        update.set("frequency", event.getFrequency());
+        update.set("tally", event.getTally());
         update.set("firstOccurrence", event.getFirstOccurrence());
         update.set("lastOccurrence", event.getLastOccurrence());
         update.set("domainId", event.getDomainId());

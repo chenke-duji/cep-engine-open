@@ -21,6 +21,21 @@
 - **传输层去重**——支持 Active-Active 采集器部署，基于指纹去重。
 - **灵活的事件源**——REST 摄取、可选 Kafka 消费者、文件监听。
 - **MongoDB 持久化**——唯一持久层（自动建索引）。
+- **JWT 登录认证**——Spring Security + MongoDB 用户（默认 `admin` 账号），保护管理 API。
+- **事件控制台 API + Web 前端**——分页事件查询、预定义 MongoDB 更新操作（Ack / Clear，右键动态菜单）、按用户的视图/过滤条件/时间格式配置；附 Vue 3 Web 控制台（`cep-web/`）。
+
+## Web 控制台（cep-web）
+
+`cep-web/` 是 Vue 3 + Vite + Element Plus 前端，提供深色运维控制台界面：事件列表、右键批量操作（默认 Ack/Clear，可用 `cep.operations` 扩展）、自定义列视图、自定义 MongoDB 过滤条件、按用户的时间格式/时区设置。
+
+```bash
+cd cep-web
+npm install
+npm run dev      # 开发服务器，/api 代理到后端 :8080
+npm run build    # 生产构建 -> dist/
+```
+
+用 Nginx 托管 `dist/` 并把 `/api` 反向代理到后端（见 `cep-web/nginx.conf`）。默认登录：`admin / admin`——请通过 `CEP_ADMIN_PASSWORD` 环境变量修改。
 
 ## 架构
 
@@ -75,6 +90,7 @@ JSON 即可程序化访问。
 - Java 21+
 - Maven 3.8+
 - MongoDB（本地或远程）
+- Node.js 18+ / npm（仅构建 `cep-web` 控制台时需要）
 
 ## 构建
 
@@ -107,6 +123,9 @@ java -jar target/cep-engine-1.0.0-SNAPSHOT.jar
 | `cep.dedup.ttl` | 见 yml | 传输层去重窗口 |
 | `cep.problem.stale.*` | 见 yml | 故障超时/清理生命周期 |
 | `cep.kafka.*` | 默认关闭 | 可选 Kafka 消费者 |
+| `cep.security.jwt.secret` | 开发默认 | JWT 签名密钥（可用 `CEP_JWT_SECRET` 覆盖） |
+| `cep.security.bootstrap-admin` | `admin` / `admin` | 初始管理员（可用 `CEP_ADMIN_USER` / `CEP_ADMIN_PASSWORD` 覆盖） |
+| `cep.operations` | `ack`、`clear` | 右键菜单的预定义 MongoDB 更新操作 |
 
 完整默认配置见 `src/main/resources/application.yml`，部署手册见 `DEPLOY.md`。
 

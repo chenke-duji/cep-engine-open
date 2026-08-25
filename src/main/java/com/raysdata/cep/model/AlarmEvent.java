@@ -20,7 +20,7 @@ public class AlarmEvent {
     private int severity;
     private int originalSeverity;
     private String summary;
-    private long frequency;
+    private long tally;
     private long firstOccurrence;
     private long lastOccurrence;
     private String domainId;
@@ -99,12 +99,12 @@ public class AlarmEvent {
         this.summary = summary;
     }
 
-    public long getFrequency() {
-        return frequency;
+    public long getTally() {
+        return tally;
     }
 
-    public void setFrequency(long frequency) {
-        this.frequency = frequency;
+    public void setTally(long tally) {
+        this.tally = tally;
     }
 
     public long getFirstOccurrence() {
@@ -330,7 +330,7 @@ public class AlarmEvent {
                 ", severity=" + severity +
                 ", domainId='" + domainId + '\'' +
                 ", eventType='" + eventType + '\'' +
-                ", frequency=" + frequency +
+                ", tally=" + tally +
                 '}';
     }
 }

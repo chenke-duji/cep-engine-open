@@ -29,6 +29,30 @@ deduplication, severity grading, and lifecycle resolution.
 - **Flexible event sources** – REST ingest, Kafka consumer (optional), file
   tailer.
 - **MongoDB persistence** – sole persistence layer (auto index creation).
+- **JWT login authentication** – Spring Security with MongoDB-backed users
+  (bootstrap `admin` account), protecting the management API.
+- **Event console API + web frontend** – paged event query, predefined
+  MongoDB update operations (Ack / Clear) exposed via a right-click context
+  menu, and per-user views / filters / time-format configuration. A Vue 3 web
+  console (`cep-web/`) is bundled.
+
+## Web Console (cep-web)
+
+A Vue 3 + Vite + Element Plus frontend lives in `cep-web/`. It provides a
+dark ops-console view of events, right-click bulk operations (Ack/Clear by
+default, extensible via `cep.operations`), custom column views, custom MongoDB
+filters, and per-user time format/timezone settings.
+
+```bash
+cd cep-web
+npm install
+npm run dev      # dev server, proxies /api to the backend on :8080
+npm run build    # production build -> dist/
+```
+
+Deploy `dist/` with Nginx and reverse-proxy `/api` to the backend
+(see `cep-web/nginx.conf`). Default login: `admin / admin` — change it via the
+`CEP_ADMIN_PASSWORD` environment variable.
 
 ## Architecture
 
@@ -84,6 +108,7 @@ for programmatic access without JSON parsing.
 - Java 21+
 - Maven 3.8+
 - MongoDB (local or remote)
+- Node.js 18+ / npm (only to build the `cep-web` console)
 
 ## Build
 
@@ -115,6 +140,9 @@ script directory, dedup TTL, and problem lifecycle. All connection settings use
 | `cep.dedup.ttl` | (see yml) | Transport-level dedup window |
 | `cep.problem.stale.*` | (see yml) | Problem stale/cleanup lifecycle |
 | `cep.kafka.*` | disabled | Optional Kafka consumer |
+| `cep.security.jwt.secret` | (dev default) | JWT signing secret (override with `CEP_JWT_SECRET`) |
+| `cep.security.bootstrap-admin` | `admin` / `admin` | Initial admin account (override with `CEP_ADMIN_USER` / `CEP_ADMIN_PASSWORD`) |
+| `cep.operations` | `ack`, `clear` | Predefined MongoDB update operations for the context menu |
 
 See `src/main/resources/application.yml` for the complete default set.
 

@@ -76,6 +76,42 @@ cep:
     cleanup-interval-ms: 30000
 
 # ============================================
+# Security (login authentication)
+# ============================================
+  security:
+    jwt:
+      # Secret key for JWT signing. MUST be changed in production (>= 32 chars).
+      # Supports env override via CEP_JWT_SECRET.
+      secret: ${CEP_JWT_SECRET:cep-engine-please-change-this-secret-key-0123456789abcdef}
+      # Token validity in milliseconds (default 8 hours)
+      expiration-ms: ${CEP_JWT_EXPIRATION_MS:28800000}
+      # Token issuer
+      issuer: cep-engine
+    bootstrap-admin:
+      # Initial admin account created on first startup if users collection is empty.
+      username: ${CEP_ADMIN_USER:admin}
+      password: ${CEP_ADMIN_PASSWORD:admin}
+      display-name: Administrator
+
+  # ============================================
+  # Predefined MongoDB update operations (right-click context menu)
+  # ============================================
+  operations:
+    - name: ack
+      menuLabel: "确认 (Acknowledge)"
+      confirmMessage: "确认将这些事件标记为已确认 (Acked) ？"
+      collection: events_current
+      # MongoDB update document applied to the selected events
+      update:
+        status: Acked
+    - name: clear
+      menuLabel: "清除 (Clear)"
+      confirmMessage: "确认清除这些事件 (Cleared) ？"
+      collection: events_current
+      update:
+        status: Cleared
+
+# ============================================
 # Actuator / Health
 # ============================================
 management:

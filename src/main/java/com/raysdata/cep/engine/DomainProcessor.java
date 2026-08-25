@@ -106,7 +106,7 @@ public class DomainProcessor {
 
     /**
      * Try to deduplicate an event. If the same identifier exists,
-     * merge (increment frequency, upgrade severity, update lastOccurrence)
+     * merge (increment tally, upgrade severity, update lastOccurrence)
      * and return false (caller should not write separately).
      *
      * @return true if this is a new event, false if it was merged into existing
@@ -115,12 +115,12 @@ public class DomainProcessor {
         AlarmEvent existing = activeEvents.putIfAbsent(event.getIdentifier(), event);
         if (existing == null) {
             // New event
-            event.setFrequency(1);
+            event.setTally(1);
             return true;
         }
 
         // Duplicate: merge into existing
-        existing.setFrequency(existing.getFrequency() + 1);
+        existing.setTally(existing.getTally() + 1);
         if (event.getSeverity() > existing.getSeverity()) {
             existing.setSeverity(event.getSeverity());
         }

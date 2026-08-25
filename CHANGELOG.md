@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **JWT login authentication** (Spring Security): MongoDB-backed `users`
+  collection, bootstrap `admin` account, `POST /api/v1/auth/login`. New
+  dependencies: Spring Security 6.2.4 + jjwt 0.12.5.
+- **Event console APIs**:
+  - `GET /api/v1/events/list` — paged event query with optional custom MongoDB filter
+  - `GET /api/v1/operations` — predefined update operations (from `cep.operations`)
+  - `POST /api/v1/events/operate` — bulk-apply a predefined operation to identifiers
+  - `GET/POST/PUT/DELETE /api/v1/user-prefs` — per-user views, filters, time formats
+- **`cep.operations` YAML config**: predefined MongoDB update operations
+  (default examples: `ack` → `status=Acked`, `clear` → `status=Cleared`), rendered
+  as a dynamic right-click context menu.
+- **`cep.security` YAML config**: JWT secret/expiration/issuer and bootstrap
+  admin credentials (overridable via `CEP_JWT_SECRET`, `CEP_ADMIN_PASSWORD` env).
+- **CEP Web Console** (`cep-web/`): Vue 3 + Vite + Element Plus frontend —
+  login page, event list (paged, multi-select, severity/status visualization,
+  auto refresh), right-click context menu with configured operations, and dialogs
+  for custom views (column model), custom filters (MongoDB query) and timestamp
+  format/timezone. Deploy with Nginx (`cep-web/nginx.conf`).
+
+### Changed
+
+- **`AlarmEvent.frequency` renamed to `tally`**: the model field, its getter/setter
+  (`getFrequency`/`setFrequency` → `getTally`/`setTally`), the MongoDB persisted
+  field (`frequency` → `tally` in `MongoBatchWriter`), the dedup increment logic in
+  `DomainProcessor`, and `toString` now use `tally`. Frontend types and the
+  custom-view field list in `cep-web` are updated accordingly. External consumers
+  reading `frequency` from MongoDB must switch to `tally`.
+
 ## [1.0.0] - 2026-08-24
 
 ### Initial open-source release

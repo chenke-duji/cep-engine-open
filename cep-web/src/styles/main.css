@@ -1,0 +1,160 @@
+/* ============================================
+   CEP Event Console - global dark-tech theme
+   ============================================ */
+
+:root {
+  --cep-bg: #0f1420;
+  --cep-bg-panel: #161d2b;
+  --cep-bg-elevated: #1e2737;
+  --cep-border: #2a3446;
+  --cep-text: #e6ebf2;
+  --cep-text-secondary: #9aa7bd;
+  --cep-text-muted: #6b7689;
+  --cep-primary: #1b6fe8;
+  --cep-primary-deep: #0e4fa8;
+  --cep-primary-light: #3d8bff;
+
+  --severity-critical: #f5222d;
+  --severity-major: #fa8c16;
+  --severity-minor: #fadb14;
+  --severity-warning: #1677ff;
+  --severity-indeterminate: #722ed1;
+  --severity-clear: #52c41a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--cep-bg);
+  color: var(--cep-text);
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei',
+    Arial, sans-serif;
+  font-size: 13px;
+}
+
+/* ---- Element Plus dark overrides ---- */
+html.dark {
+  color-scheme: dark;
+  --el-bg-color: #161d2b;
+  --el-bg-color-overlay: #1e2737;
+  --el-bg-color-page: #0f1420;
+  --el-fill-color-blank: #161d2b;
+  --el-border-color: #2a3446;
+  --el-border-color-light: #2a3446;
+  --el-border-color-lighter: #252f42;
+  --el-text-color-primary: #e6ebf2;
+  --el-text-color-regular: #9aa7bd;
+  --el-text-color-secondary: #6b7689;
+  --el-color-primary: #1b6fe8;
+  --el-border-radius-base: 4px;
+}
+
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: #1a2231;
+  --el-table-header-text-color: #9aa7bd;
+  --el-table-row-hover-bg-color: rgba(27, 111, 232, 0.08);
+  --el-table-border-color: #252f42;
+  --el-table-text-color: #e6ebf2;
+}
+
+.el-table__row.selected-row {
+  background: rgba(27, 111, 232, 0.15) !important;
+}
+
+/* ---- Layout helpers ---- */
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0 16px 16px;
+}
+
+.panel {
+  background: var(--cep-bg-panel);
+  border: 1px solid var(--cep-border);
+  border-radius: 6px;
+}
+
+/* ---- Severity tag colors ---- */
+.sev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.sev-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sev-5 { color: #ff7875; }
+.sev-4 { color: #ffa940; }
+.sev-3 { color: #ffd666; }
+.sev-2 { color: #69b1ff; }
+.sev-1 { color: #b37feb; }
+.sev-0 { color: #73d13d; }
+.sev-dot-5 { background: var(--severity-critical); }
+.sev-dot-4 { background: var(--severity-major); }
+.sev-dot-3 { background: var(--severity-minor); }
+.sev-dot-2 { background: var(--severity-warning); }
+.sev-dot-1 { background: var(--severity-indeterminate); }
+.sev-dot-0 { background: var(--severity-clear); }
+
+/* ---- Context menu ---- */
+.context-menu {
+  position: fixed;
+  z-index: 3000;
+  min-width: 180px;
+  background: #1e2737;
+  border: 1px solid #2a3446;
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--cep-text);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-menu-item:hover {
+  background: rgba(27, 111, 232, 0.2);
+}
+
+.context-menu-item.disabled {
+  color: var(--cep-text-muted);
+  cursor: not-allowed;
+}
+
+.context-menu-sep {
+  height: 1px;
+  background: #2a3446;
+  margin: 6px 4px;
+}
