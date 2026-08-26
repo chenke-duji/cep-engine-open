@@ -81,6 +81,22 @@ variables. Key settings:
 
 ## 5. Run
 
+### 5.1 Linux start/stop script (recommended)
+
+`bin/cep-engine.sh` manages the process (`start|stop|restart|status`):
+
+```bash
+./bin/cep-engine.sh start     # run in background, logs to logs/cep-engine.log
+./bin/cep-engine.sh status
+./bin/cep-engine.sh restart
+./bin/cep-engine.sh stop      # graceful stop with 30s force-kill timeout
+```
+
+The script runs from the jar directory and tracks the PID in `cep-engine.pid`.
+Override via env: `APP_HOME`, `JAVA_OPTS`, `APP_ARGS`, `JAVA_HOME`.
+
+### 5.2 Direct run
+
 ```bash
 java -jar target/cep-engine-<version>.jar
 ```
