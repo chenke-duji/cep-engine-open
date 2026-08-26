@@ -18,9 +18,10 @@ PID_FILE="cep-engine.pid"
 LOG_DIR="logs"
 LOG_FILE="${LOG_DIR}/cep-engine.log"
 
-# Directory containing this script (fall back to current dir).
+# Directory containing this script, and the app home = the directory above it
+# (the jar sits next to bin/ in the deployment layout).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_HOME="${APP_HOME:-${SCRIPT_DIR}}"
+APP_HOME="${APP_HOME:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 
 # Java options. Adjust heap and JVM flags as needed.
 JAVA_BIN="${JAVA_HOME:+${JAVA_HOME}/bin/}java"
