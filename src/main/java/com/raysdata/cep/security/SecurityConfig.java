@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/events").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/events/batch").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/events").permitAll()
                 .requestMatchers("/api/v1/stats/dedup").permitAll()
                 // Any other /api/v1/** endpoint requires authentication

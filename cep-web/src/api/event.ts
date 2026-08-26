@@ -30,3 +30,24 @@ export async function operate(
   const res = await http.post('/events/operate', { operation, identifiers })
   return res.data as OperateResult
 }
+
+/** An event that no script could parse (unsupported MIB trap etc). */
+export interface UnresolvedEvent {
+  id?: string
+  source?: string
+  sourceIp?: string
+  originTimestamp?: number
+  receivedAt?: number
+  reason?: string
+  metadata?: Record<string, unknown>
+  rawJson?: string
+}
+
+/** Paged query of unresolved events. */
+export async function fetchUnresolved(q: {
+  page?: number
+  size?: number
+} = {}): Promise<PagedResult<UnresolvedEvent>> {
+  const res = await http.get('/events/unresolved', { params: q })
+  return res.data as PagedResult<UnresolvedEvent>
+}

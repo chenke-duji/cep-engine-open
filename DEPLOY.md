@@ -133,6 +133,11 @@ moved to `events_history`.
 **Event history**: resolved events are kept in `events_current` for the retention
 window, then a scheduled cleaner moves them to `events_history`.
 
+**Unresolved events**: events that no parser script could recognize (e.g. an
+unsupported MIB trap) are not dropped. Their raw payload is persisted to
+`events_unresolved` and can be inspected in the console's "Unresolved events"
+view (`GET /api/v1/events/unresolved`).
+
 | Env / key | Default | Purpose |
 |-----------|---------|---------|
 | `CEP_MONGO_HISTORY_RETENTION_MS` | 300000 (5 min) | How long a resolved event stays in `events_current` |

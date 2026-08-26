@@ -5,17 +5,24 @@
       <div class="topbar-left">
         <span class="app-title">CEP 事件管理</span>
         <el-divider direction="vertical" />
-        <span class="view-label">视图：</span>
-        <el-select
-          v-model="currentViewId"
-          size="small"
-          style="width: 160px"
-          @change="onViewChange"
-        >
-          <el-option v-for="v in views" :key="v.id" :label="viewLabel(v)" :value="v.id" />
-        </el-select>
-        <el-button size="small" :icon="Edit" @click="openViewDialog()">管理视图</el-button>
-        <el-button size="small" :icon="Filter" @click="openFilterDialog()">管理过滤</el-button>
+        <el-radio-group v-model="activeView" size="small">
+          <el-radio-button value="events">事件列表</el-radio-button>
+          <el-radio-button value="unresolved">未解析事件</el-radio-button>
+        </el-radio-group>
+        <template v-if="activeView === 'events'">
+          <el-divider direction="vertical" />
+          <span class="view-label">视图：</span>
+          <el-select
+            v-model="currentViewId"
+            size="small"
+            style="width: 160px"
+            @change="onViewChange"
+          >
+            <el-option v-for="v in views" :key="v.id" :label="viewLabel(v)" :value="v.id" />
+          </el-select>
+          <el-button size="small" :icon="Edit" @click="openViewDialog()">管理视图</el-button>
+          <el-button size="small" :icon="Filter" @click="openFilterDialog()">管理过滤</el-button>
+        </template>
       </div>
       <div class="topbar-right">
         <el-switch
@@ -40,13 +47,13 @@
       </div>
     </header>
 
-    <!-- Filter bar -->
-    <div class="filter-area">
+    <!-- Filter bar (events view) -->
+    <div v-if="activeView === 'events'" class="filter-area">
       <FilterBar ref="filterBarRef" @search="onSearch" />
     </div>
 
-    <!-- Event table -->
-    <div class="page-body table-area">
+    <!-- Event table (events view) -->
+    <div v-if="activeView === 'events'" class="page-body table-area">
       <EventTable
         ref="tableRef"
         :events="events"
@@ -67,6 +74,11 @@
           @size-change="onSizeChange"
         />
       </div>
+    </div>
+
+    <!-- Unresolved events view -->
+    <div v-if="activeView === 'unresolved'" class="page-body">
+      <UnresolvedEventsPanel />
     </div>
 
     <!-- Right-click context menu -->
@@ -141,12 +153,16 @@ import EventTable from '@/components/EventTable.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import OperationContextMenu from '@/components/OperationContextMenu.vue'
 import OperateConfirmDialog from '@/components/OperateConfirmDialog.vue'
+import UnresolvedEventsPanel from '@/components/UnresolvedEventsPanel.vue'
 import ViewConfigDialog from '@/components/ViewConfigDialog.vue'
 import FilterConfigDialog from '@/components/FilterConfigDialog.vue'
 import TimeFormatDialog from '@/components/TimeFormatDialog.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+// ---- View switcher: 'events' | 'unresolved' ----
+const activeView = ref<'events' | 'unresolved'>('events')
 
 // ---- Event list state ----
 const events = ref<AlarmEvent[]>([])

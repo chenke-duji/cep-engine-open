@@ -13,6 +13,7 @@ import com.raysdata.cep.model.HookContext;
 import com.raysdata.cep.model.HookResult;
 import com.raysdata.cep.model.RawEvent;
 import com.raysdata.cep.model.ResultAction;
+import com.raysdata.cep.store.MongoBatchWriter;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -43,10 +44,13 @@ public class EventProcessingChain {
 
     private final ScriptRegistry scriptRegistry;
     private final DomainProcessorRouter domainRouter;
+    private final MongoBatchWriter mongoBatchWriter;
 
-    public EventProcessingChain(ScriptRegistry scriptRegistry, DomainProcessorRouter domainRouter) {
+    public EventProcessingChain(ScriptRegistry scriptRegistry, DomainProcessorRouter domainRouter,
+                                MongoBatchWriter mongoBatchWriter) {
         this.scriptRegistry = scriptRegistry;
         this.domainRouter = domainRouter;
+        this.mongoBatchWriter = mongoBatchWriter;
     }
 
     /**
@@ -60,7 +64,13 @@ public class EventProcessingChain {
             String rawJson = gson.toJson(rawEvent);
             AlarmEvent event = parseRawEvent(rawEvent, rawJson);
             if (event == null) {
-                log.warn("No matching script or parse returned null for: {}", rawEvent);
+                // Unsupported / unparseable event: keep the raw payload for later
+                // inspection instead of silently dropping it.
+                try {
+                    mongoBatchWriter.insertUnresolved(rawEvent, rawJson, "no matching script or parse returned null");
+                } catch (Exception e) {
+                    log.error("Failed to persist unresolved event", e);
+                }
                 return;
             }
 

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.raysdata.cep.config.EventOperationProperties;
 import com.raysdata.cep.model.AlarmEvent;
+import com.raysdata.cep.model.UnresolvedEvent;
 import com.raysdata.cep.store.EventOperationExecutor;
 import com.raysdata.cep.store.EventOperationExecutor.OperationResult;
 import com.raysdata.cep.store.MongoBatchWriter;
@@ -73,6 +74,29 @@ public class EventOperationController {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "invalid query: " + e.getMessage()
             ));
+        }
+    }
+
+    /**
+     * Paged query of unresolved events (events that no script could parse,
+     * e.g. unsupported MIB traps).
+     *
+     * GET /api/v1/events/unresolved?page=1&size=50
+     */
+    @GetMapping("/events/unresolved")
+    public ResponseEntity<Map<String, Object>> listUnresolved(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        try {
+            MongoBatchWriter.PagedResult<UnresolvedEvent> result = mongoBatchWriter.findUnresolvedPaged(page, size);
+            return ResponseEntity.ok(Map.of(
+                    "items", result.getItems(),
+                    "total", result.getTotal(),
+                    "page", result.getPage(),
+                    "size", result.getSize()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 

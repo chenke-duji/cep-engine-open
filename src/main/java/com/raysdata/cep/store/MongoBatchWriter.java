@@ -12,6 +12,8 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
 import com.raysdata.cep.model.AlarmEvent;
+import com.raysdata.cep.model.RawEvent;
+import com.raysdata.cep.model.UnresolvedEvent;
 
 /**
  * Batch writer for MongoDB.
@@ -178,6 +180,9 @@ public class MongoBatchWriter {
     /** History collection for resolved/closed events. */
     public static final String HISTORY_COLLECTION = "events_history";
 
+    /** Collection for events that could not be parsed (unsupported MIB traps etc). */
+    public static final String UNRESOLVED_COLLECTION = "events_unresolved";
+
     /**
      * Move resolved events (Problem marked Cleared, or Resolution events) from
      * the current collection into the history collection once they are older
@@ -246,6 +251,47 @@ public class MongoBatchWriter {
             log.error("Failed to move event {} to history", event.getIdentifier(), e);
             return false;
         }
+    }
+
+    // --- Unresolved events (events_unresolved) ---
+
+    /**
+     * Persist a raw event that could not be parsed (e.g. unsupported MIB trap)
+     * to the <code>events_unresolved</code> collection for later inspection.
+     *
+     * @param rawEvent    the original RawEvent from the collector
+     * @param rawJson     the serialized RawEvent JSON
+     * @param reason      why parsing failed (e.g. "no matching script")
+     */
+    public void insertUnresolved(RawEvent rawEvent, String rawJson, String reason) {
+        UnresolvedEvent ue = new UnresolvedEvent();
+        ue.setSource(rawEvent.getSource());
+        ue.setSourceIp(rawEvent.getSourceIp());
+        ue.setOriginTimestamp(rawEvent.getOriginTimestamp());
+        ue.setReceivedAt(System.currentTimeMillis());
+        ue.setReason(reason);
+        ue.setMetadata(rawEvent.getMetadata());
+        ue.setRawJson(rawJson);
+        mongoTemplate.insert(ue, UNRESOLVED_COLLECTION);
+        log.warn("Stored unresolved event to {}: source={}, sourceIp={}, reason={}",
+                UNRESOLVED_COLLECTION, ue.getSource(), ue.getSourceIp(), reason);
+    }
+
+    /**
+     * Paged query over the unresolved events collection (newest first).
+     */
+    public PagedResult<UnresolvedEvent> findUnresolvedPaged(int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 1000);
+        Query countQuery = new Query();
+        long total = mongoTemplate.count(countQuery, UNRESOLVED_COLLECTION);
+
+        Query pageQuery = new Query()
+                .skip((long) (safePage - 1) * safeSize).limit(safeSize)
+                .with(org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Direction.DESC, "receivedAt"));
+        List<UnresolvedEvent> items = mongoTemplate.find(pageQuery, UnresolvedEvent.class, UNRESOLVED_COLLECTION);
+        return new PagedResult<>(items, total, safePage, safeSize);
     }
 
     // --- Internal ---
