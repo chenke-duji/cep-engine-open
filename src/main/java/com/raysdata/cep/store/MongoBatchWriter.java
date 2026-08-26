@@ -9,18 +9,17 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.raysdata.cep.engine.DomainProcessorRouter;
 import com.raysdata.cep.model.AlarmEvent;
 
 /**
  * Batch writer for MongoDB.
  * <p>
- * Collects events from all DomainProcessors' pending upsert buffers and
- * writes them to MongoDB in bulk. Runs on a fixed schedule to batch
- * writes for throughput optimization.
+ * Performs bulk upsert / history operations on the events collections. The
+ * scheduled flush that drains DomainProcessors' pending buffers lives in
+ * {@link com.raysdata.cep.store.BatchFlushScheduler} to avoid a bean cycle
+ * between this writer and the domain router.
  */
 @Component
 public class MongoBatchWriter {
@@ -28,24 +27,9 @@ public class MongoBatchWriter {
     private static final Logger log = LoggerFactory.getLogger(MongoBatchWriter.class);
 
     private final MongoTemplate mongoTemplate;
-    private final DomainProcessorRouter domainRouter;
 
-    public MongoBatchWriter(MongoTemplate mongoTemplate, DomainProcessorRouter domainRouter) {
+    public MongoBatchWriter(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
-        this.domainRouter = domainRouter;
-    }
-
-    /**
-     * Flush all pending upserts to MongoDB on a fixed interval.
-     * Default: every 500ms.
-     */
-    @Scheduled(fixedDelayString = "${cep.mongo.batch-writer.flush-interval-ms:500}")
-    public void scheduledFlush() {
-        try {
-            domainRouter.flushAll();
-        } catch (Exception e) {
-            log.error("Error during scheduled flush", e);
-        }
     }
 
     /**
