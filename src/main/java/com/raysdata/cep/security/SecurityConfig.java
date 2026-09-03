@@ -1,7 +1,9 @@
 package com.raysdata.cep.security;
 
+import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +34,14 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    /**
+     * Comma-separated list of allowed CORS origins (e.g. "https://cep.example.com").
+     * Empty/blank means no cross-origin access is granted (browser same-origin
+     * only). SEC-03: never default to "*".
+     */
+    @Value("${cep.cors.allowed-origins:}")
+    private String allowedOrigins;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
@@ -58,8 +68,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/events").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/events/batch").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/events").permitAll()
                 .requestMatchers("/api/v1/stats/dedup").permitAll()
+                // Build/version info is not sensitive; shown in the console footer
+                .requestMatchers("/api/v1/version").permitAll()
+                // SEC-02: script reload can execute arbitrary Groovy, restrict to admins
+                .requestMatchers(HttpMethod.POST, "/api/v1/scripts/reload").hasRole("ADMIN")
                 // Any other /api/v1/** endpoint requires authentication
                 .anyRequest().authenticated()
             )
@@ -68,17 +81,27 @@ public class SecurityConfig {
     }
 
     /**
-     * CORS: allow the independent frontend (any origin) to call the API.
-     * Restrict in production to the actual frontend origin if needed.
+     * CORS: allow only explicitly configured frontend origins. Never default to
+     * "*" combined with credentials (SEC-03). When {@code cep.cors.allowed-origins}
+     * is unset, no cross-origin origin is whitelisted (browser same-origin only).
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            config.setAllowedOriginPatterns(
+                    Arrays.stream(allowedOrigins.split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList());
+            config.setAllowCredentials(true);
+        } else {
+            // No cross-origin access; do not set credentials/patterns.
+            config.setAllowedOriginPatterns(List.of());
+        }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

@@ -23,8 +23,10 @@ spring:
       # or set username/password/authentication-database below.
       uri: ${MONGO_URI:mongodb://localhost:27017/cep}
       database: ${MONGO_DATABASE:cep}
-      username: ${MONGO_USERNAME:}
-      password: ${MONGO_PASSWORD:}
+      # Leave blank when MongoDB has no auth. Do NOT use "${MONGO_USERNAME:}"
+      # (Spring Boot binds the empty placeholder to char[] and fails on startup).
+      username:
+      password:
       # Auth source database (usually "admin"); only needed when username is set.
       authentication-database: ${MONGO_AUTH_DB:admin}
       auto-index-creation: true
@@ -71,6 +73,12 @@ cep:
     ttl-ms: 10000
     cleanup-interval-ms: 30000
 
+  # ---- CORS ----
+  # Comma-separated list of allowed frontend origins. Leave empty for
+  # same-origin only (recommended behind a reverse proxy).
+  cors:
+    allowed-origins: ${CEP_CORS_ALLOWED_ORIGINS:}
+
 # ---- Security (console login) ----
   security:
     jwt:
@@ -80,8 +88,10 @@ cep:
       expiration-ms: ${CEP_JWT_EXPIRATION_MS:28800000}
       issuer: cep-engine
     bootstrap-admin:
+      # No weak default password. If unset, a random password is generated and
+      # printed to the log on first bootstrap.
       username: ${CEP_ADMIN_USER:admin}
-      password: ${CEP_ADMIN_PASSWORD:admin}
+      password: ${CEP_ADMIN_PASSWORD:}
       display-name: Administrator
 
 # ---- Predefined MongoDB update operations (right-click menu) ----

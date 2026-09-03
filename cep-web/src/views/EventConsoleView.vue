@@ -20,7 +20,8 @@
           >
             <el-option v-for="v in views" :key="v.id" :label="viewLabel(v)" :value="v.id" />
           </el-select>
-          <el-button size="small" :icon="Edit" @click="openViewDialog()">管理视图</el-button>
+          <el-button size="small" type="primary" :icon="Plus" @click="openViewDialog()">新建视图</el-button>
+          <el-button size="small" :icon="Edit" :disabled="!currentViewId" @click="openEditViewDialog()">编辑</el-button>
           <el-button size="small" :icon="Filter" @click="openFilterDialog()">管理过滤</el-button>
         </template>
       </div>
@@ -56,11 +57,12 @@
     <div v-if="activeView === 'events'" class="page-body table-area">
       <EventTable
         ref="tableRef"
-        :events="events"
+        :events="visibleEvents"
         :columns="activeColumns"
         :loading="loading"
         @selection-change="onSelectionChange"
         @context-menu="onContextMenu"
+        @row-dblclick="onRowDblClick"
       />
       <div class="pagination-bar">
         <span class="total">共 {{ total }} 条</span>
@@ -90,6 +92,7 @@
       :selected-count="selectedRows.length"
       :selected-rows="selectedRows"
       @select="onMenuSelect"
+      @detail="onMenuDetail"
       @close="closeMenu"
     />
 
@@ -105,6 +108,7 @@
 
     <!-- View config dialog -->
     <ViewConfigDialog
+      :key="viewDialog.dialogKey"
       :visible="viewDialog.visible"
       :view="viewDialog.editing"
       :loading="viewDialog.loading"
@@ -129,6 +133,21 @@
       @close="timeDialog.visible = false"
       @apply="applyTimeFormat"
     />
+
+    <!-- Event detail dialog -->
+    <EventDetailDialog
+      :visible="detailDialog.visible"
+      :event="detailDialog.event"
+      @close="detailDialog.visible = false"
+    />
+
+    <!-- Page footer: build identity -->
+    <footer class="page-footer">
+      <span v-if="buildInfo" class="footer-build">
+        CEP Engine v{{ buildInfo.version }} &middot; 构建 {{ buildInfo.buildTime }}
+      </span>
+      <span v-else class="footer-build">CEP Engine</span>
+    </footer>
   </div>
 </template>
 
@@ -137,7 +156,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Edit, Filter, Refresh, Clock, User,
+  Edit, Filter, Refresh, Clock, User, Plus,
 } from '@element-plus/icons-vue'
 import type {
   AlarmEvent, ColumnDef, Operation, ViewConfig,
@@ -148,11 +167,13 @@ import {
   fetchPrefs, createPref, updatePref, deletePref, fetchDefaultTimeFormat,
 } from '@/api/userprefs'
 import { setTimeFormat, getTimeFormat } from '@/utils/time'
+import { fetchBuildInfo, type BuildInfo } from '@/api/version'
 import { useAuthStore } from '@/stores/auth'
 import EventTable from '@/components/EventTable.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import OperationContextMenu from '@/components/OperationContextMenu.vue'
 import OperateConfirmDialog from '@/components/OperateConfirmDialog.vue'
+import EventDetailDialog from '@/components/EventDetailDialog.vue'
 import UnresolvedEventsPanel from '@/components/UnresolvedEventsPanel.vue'
 import ViewConfigDialog from '@/components/ViewConfigDialog.vue'
 import FilterConfigDialog from '@/components/FilterConfigDialog.vue'
@@ -172,7 +193,42 @@ const pageSize = ref(50)
 const loading = ref(false)
 const autoRefresh = ref(false)
 const currentFilter = ref<string | undefined>(undefined)
+// Free-text keyword matched locally across ALL fields of the currently loaded
+// rows (no extra backend request).
+const filterKeyword = ref('')
 let refreshTimer: number | undefined
+
+/** Rows actually shown in the table: server rows filtered by the local keyword. */
+const visibleEvents = computed<AlarmEvent[]>(() => {
+  const kw = filterKeyword.value
+  if (!kw) return events.value
+  const lower = kw.toLowerCase()
+  return events.value.filter((e) => keywordMatches(e, lower))
+})
+
+/** Does any scalar field of the event contain the (lower-cased) keyword? */
+function keywordMatches(e: AlarmEvent, lower: string): boolean {
+  const val: unknown[] = [e]
+  while (val.length) {
+    const item = val.pop()
+    if (item == null) continue
+    if (typeof item === 'string') {
+      if (item.toLowerCase().includes(lower)) return true
+      continue
+    }
+    if (typeof item === 'number' || typeof item === 'boolean') {
+      if (String(item).toLowerCase().includes(lower)) return true
+      continue
+    }
+    if (typeof item === 'object') {
+      // Walk dynamicFields / nested objects without infinite recursion.
+      for (const v of Object.values(item as Record<string, unknown>)) {
+        val.push(v)
+      }
+    }
+  }
+  return false
+}
 
 // ---- Views ----
 const views = ref<UserPref[]>([])
@@ -184,6 +240,9 @@ const activeColumns = computed<ColumnDef[]>(() => {
   return cols && cols.length ? cols : defaultColumns()
 })
 
+// ---- Build info (footer) ----
+const buildInfo = ref<BuildInfo | null>(null)
+
 // ---- Operations & selection ----
 const operations = ref<Operation[]>([])
 const selectedRows = ref<AlarmEvent[]>([])
@@ -194,10 +253,13 @@ const confirm = reactive<{ visible: boolean; operation: Operation | null }>({
   visible: false, operation: null,
 })
 const operating = ref(false)
+const detailDialog = reactive<{ visible: boolean; event: AlarmEvent | null }>({
+  visible: false, event: null,
+})
 
 // ---- Dialogs ----
-const viewDialog = reactive<{ visible: boolean; editing: ViewConfig | null; loading: boolean }>({
-  visible: false, editing: null, loading: false,
+const viewDialog = reactive<{ visible: boolean; editing: ViewConfig | null; loading: boolean; dialogKey: number }>({
+  visible: false, editing: null, loading: false, dialogKey: 0,
 })
 const filterDialog = reactive<{ visible: boolean; editing: FilterConfig | null; loading: boolean }>({
   visible: false, editing: null, loading: false,
@@ -266,6 +328,9 @@ async function loadEvents() {
     total.value = res.total
     selectedRows.value = []
     tableRef.value?.clearSelection()
+    if (res.collectionExists === false) {
+      ElMessage.warning(res.message || '事件集合尚不存在，可能还没有 trap/syslog 事件写入。')
+    }
   } catch {
     // message handled by interceptor
   } finally {
@@ -273,8 +338,9 @@ async function loadEvents() {
   }
 }
 
-function onSearch(criteria: { filter?: string }) {
+function onSearch(criteria: { filter?: string; keyword?: string }) {
   currentFilter.value = criteria.filter
+  filterKeyword.value = criteria.keyword || ''
   page.value = 1
   loadEvents()
 }
@@ -310,6 +376,20 @@ function onMenuSelect(op: Operation) {
   confirm.visible = true
 }
 
+/** Show the detail dialog for the selected event(s). */
+function onMenuDetail() {
+  closeMenu()
+  if (selectedRows.value.length === 0) return
+  detailDialog.event = selectedRows.value[0]
+  detailDialog.visible = true
+}
+
+/** Double-clicking a row opens the detail dialog for that row. */
+function onRowDblClick(row: AlarmEvent) {
+  detailDialog.event = row
+  detailDialog.visible = true
+}
+
 async function executeOperation() {
   if (!confirm.operation || selectedRows.value.length === 0) return
   operating.value = true
@@ -331,6 +411,23 @@ async function executeOperation() {
 // ---- View management ----
 function openViewDialog() {
   viewDialog.editing = null
+  viewDialog.dialogKey++
+  viewDialog.visible = true
+}
+
+/** Open the dialog in "edit" mode for the currently selected view. */
+function openEditViewDialog() {
+  if (!currentViewId.value) return
+  const v = views.value.find((x) => x.id === currentViewId.value)
+  if (!v) return
+  viewDialog.editing = {
+    id: v.id,
+    name: v.name,
+    isDefault: v.isDefault,
+    isPublic: v.isPublic,
+    config: JSON.parse(JSON.stringify(v.config || { columns: [] })) as ViewConfig['config'],
+  }
+  viewDialog.dialogKey++
   viewDialog.visible = true
 }
 
@@ -382,7 +479,6 @@ async function saveFilter(data: FilterConfig) {
     }
     ElMessage.success('过滤条件已保存')
     filterDialog.visible = false
-    filterBarRef.value?.reload()
   } catch {
     // handled
   } finally {
@@ -457,12 +553,28 @@ watch(autoRefresh, (v) => {
 onMounted(async () => {
   await Promise.all([loadViews(), loadOperations(), loadTimeFormat()])
   loadEvents()
+  buildInfo.value = await fetchBuildInfo()
 })
 
 onUnmounted(stopAutoRefresh)
 </script>
 
 <style scoped>
+.page-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 26px;
+  padding: 0 16px;
+  font-size: 12px;
+  color: var(--cep-text-muted, #6b7689);
+  border-top: 1px solid var(--cep-border, #222b3c);
+  background: var(--cep-bg-panel, #161d2b);
+}
+.footer-build {
+  white-space: nowrap;
+}
 .topbar {
   display: flex;
   align-items: center;

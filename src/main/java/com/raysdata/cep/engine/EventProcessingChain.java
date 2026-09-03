@@ -16,8 +16,6 @@ import com.raysdata.cep.model.ResultAction;
 import com.raysdata.cep.store.MongoBatchWriter;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 /**
  * Core event processing chain.
@@ -82,7 +80,11 @@ public class EventProcessingChain {
                 event.setFirstOccurrence(System.currentTimeMillis());
             }
             event.setLastOccurrence(System.currentTimeMillis());
-            event.setReceiveTime(String.valueOf(System.currentTimeMillis()));
+            event.setReceiveTime(System.currentTimeMillis());
+            // Default status: every freshly parsed event starts un-acknowledged.
+            if (event.getStatus() == null || event.getStatus().isBlank()) {
+                event.setStatus("UnAcked");
+            }
 
             // Route to domain processor
             DomainProcessor dp = domainRouter.getOrCreate(event.getDomainId());

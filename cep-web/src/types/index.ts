@@ -3,6 +3,8 @@
 /** AlarmEvent model from cep-engine (subset used by the console). */
 export interface AlarmEvent {
   identifier: string
+  /** Monotonic numeric id assigned once on first insert (stable, unique). */
+  serial?: number
   node?: string
   nodeAlias?: string
   severity?: number
@@ -19,8 +21,9 @@ export interface AlarmEvent {
   vendor?: string
   eventType?: string
   specificTrap?: string
-  receiveTime?: string
-  clearTime?: string
+  receiveTime?: number
+  clearTime?: number
+  deleteTime?: number
   recoveryTime?: number
   dynamicFields?: Record<string, unknown>
   [key: string]: unknown
@@ -32,6 +35,10 @@ export interface PagedResult<T> {
   total: number
   page: number
   size: number
+  /** Present when the events collection does not exist yet (no writes so far). */
+  collectionExists?: boolean
+  /** Human-readable message shown when collectionExists is false. */
+  message?: string
 }
 
 /** A predefined update operation exposed by the backend. */
@@ -39,7 +46,8 @@ export interface Operation {
   name: string
   menuLabel: string
   confirmMessage: string
-  enableWhen: string
+  /** Optional server-side condition (e.g. "status!=Acked") enabling the menu item. */
+  enableWhen?: string
 }
 
 /** A column definition within a custom view. */

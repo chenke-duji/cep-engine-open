@@ -14,7 +14,7 @@
         <el-table :data="form.config.columns" size="small" border style="width: 100%">
           <el-table-column label="字段" width="220">
             <template #default="{ row }">
-              <el-select v-model="row.field" size="small" style="width: 100%">
+              <el-select v-model="row.field" size="small" style="width: 100%" @change="onFieldChange(row)">
                 <el-option v-for="f in availableFields" :key="f" :label="f" :value="f" />
               </el-select>
             </template>
@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ViewConfig, ColumnDef } from '@/types'
 import { useAuthStore } from '@/stores/auth'
@@ -85,41 +85,33 @@ const isAdmin = auth.isAdmin
 
 const availableFields = [
   'identifier', 'node', 'nodeAlias', 'severity', 'summary', 'status',
-  'domainId', 'alertGroup', 'alertGroupName', 'vendor', 'eventType',
+  'alertGroup', 'alertGroupName', 'vendor', 'eventType',
   'specificTrap', 'firstOccurrence', 'lastOccurrence', 'tally',
   'receiveTime', 'clearTime', 'recoveryTime', 'eventClass', 'alertKey',
   'originalSeverity', 'originalSummary', 'siteNum', 'ticketId', 'agentType',
 ]
 
+// The form is initialized once from the view prop. The parent forces a fresh
+// mount (via :key) every time the dialog opens, so this state always reflects
+// the view being edited and edits are never lost.
 const form = reactive<{
   name: string
   isDefault: boolean
   isPublic: boolean
   config: { columns: ColumnDef[] }
-}>({
-  name: '',
-  isDefault: false,
-  isPublic: false,
-  config: { columns: [] },
-})
-
-watch(
-  () => props.visible,
-  (v) => {
-    if (!v) return
-    if (props.view) {
-      form.name = props.view.name
-      form.isDefault = props.view.isDefault
-      form.isPublic = props.view.isPublic
-      form.config.columns = (props.view.config.columns || []).map((c) => ({ ...c }))
-    } else {
-      form.name = ''
-      form.isDefault = false
-      form.isPublic = false
-      form.config.columns = defaultColumns()
+}>(props.view
+  ? {
+      name: props.view.name,
+      isDefault: props.view.isDefault,
+      isPublic: props.view.isPublic,
+      config: { columns: (props.view.config.columns || []).map((c) => ({ ...c })) },
     }
-  },
-)
+  : {
+      name: '',
+      isDefault: false,
+      isPublic: false,
+      config: { columns: defaultColumns() },
+    })
 
 function defaultColumns(): ColumnDef[] {
   return [
@@ -129,6 +121,28 @@ function defaultColumns(): ColumnDef[] {
     { field: 'status', title: '状态', width: 100 },
     { field: 'lastOccurrence', title: '最近发生', width: 180, sortable: true },
   ]
+}
+
+/** Human-readable title for each available field (used when the user picks a field). */
+const FIELD_TITLES: Record<string, string> = {
+  identifier: '标识', node: '节点', nodeAlias: '节点别名', severity: '级别',
+  summary: '摘要', status: '状态', alertGroup: '告警组', alertGroupName: '告警组名',
+  vendor: '厂商', eventType: '事件类型', specificTrap: '特定陷阱',
+  firstOccurrence: '首次发生', lastOccurrence: '最近发生', tally: '次数',
+  receiveTime: '接收时间', clearTime: '清除时间', recoveryTime: '恢复时间',
+  eventClass: '事件类', alertKey: '告警键', originalSeverity: '原始级别',
+  originalSummary: '原始摘要', siteNum: '站点号', ticketId: '工单号', agentType: '采集类型',
+}
+
+/**
+ * When the user picks a field for a column, auto-fill the title unless it was
+ * already customized (i.e. not the default "摘要" placeholder).
+ */
+function onFieldChange(row: ColumnDef) {
+  const suggested = FIELD_TITLES[row.field]
+  if (!row.title || row.title === '摘要') {
+    row.title = suggested || row.field
+  }
 }
 
 function addCol() {
@@ -159,7 +173,9 @@ function save() {
     name: form.name.trim(),
     isDefault: form.isDefault,
     isPublic: form.isPublic,
-    config: { columns: form.config.columns },
+    // Deep-copy the columns so the submitted payload reflects the current form
+    // state and never shares a reference with the original view object.
+    config: { columns: JSON.parse(JSON.stringify(form.config.columns)) },
   })
 }
 </script>

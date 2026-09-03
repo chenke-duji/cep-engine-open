@@ -1,10 +1,13 @@
 package com.raysdata.cep.store;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.BulkOperations;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -44,9 +47,17 @@ public class MongoBatchWriter {
         if (events == null || events.isEmpty()) return;
 
         String collectionName = getCollectionName(domainId);
+        // Determine which identifiers already exist so we only allocate a serial
+        // to genuinely new records (re-upserts of an existing key must NOT
+        // consume/change its serial).
+        Set<String> existing = findExistingIdentifiers(events, collectionName);
+
         BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, collectionName);
 
         for (AlarmEvent event : events) {
+            if (event.getIdentifier() == null || !existing.contains(event.getIdentifier())) {
+                event.setSerial(nextSerial());
+            }
             Query query = Query.query(Criteria.where("identifier").is(event.getIdentifier()));
             Update update = buildUpdate(event);
             bulkOps.upsert(query, update);
@@ -71,10 +82,60 @@ public class MongoBatchWriter {
     }
 
     /**
+     * Return the identifiers among {@code events} that already exist in the
+     * collection, so callers can avoid allocating a new serial for them.
+     */
+    private Set<String> findExistingIdentifiers(List<AlarmEvent> events, String collectionName) {
+        Set<String> out = new HashSet<>();
+        List<String> ids = events.stream()
+                .map(AlarmEvent::getIdentifier)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct().toList();
+        if (ids.isEmpty()) return out;
+        try {
+            Query q = Query.query(Criteria.where("identifier").in(ids));
+            q.fields().include("identifier");
+            mongoTemplate.find(q, org.bson.Document.class, collectionName)
+                    .forEach(doc -> {
+                        Object id = doc.get("identifier");
+                        if (id != null) out.add(id.toString());
+                    });
+        } catch (Exception e) {
+            log.warn("findExistingIdentifiers failed, will allocate serials as new: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * Atomically increment a per-engine monotonic counter and return the new
+     * value, used to assign an {@code AlarmEvent.serial} on first insert. The
+     * counter document lives in a separate "counters" collection so updates to
+     * events_current never contend with it.
+     */
+    private long nextSerial() {
+        Query q = Query.query(Criteria.where("_id").is("event_serial"));
+        Update u = new Update().inc("seq", 1);
+        FindAndModifyOptions opts = FindAndModifyOptions.options().upsert(true).returnNew(true);
+        try {
+            org.bson.Document doc = mongoTemplate.findAndModify(
+                    q, u, opts, org.bson.Document.class, "counters");
+            Object seq = doc != null ? doc.get("seq") : null;
+            return seq instanceof Number ? ((Number) seq).longValue() : 1L;
+        } catch (Exception e) {
+            log.warn("nextSerial() failed, falling back to time-based id: {}", e.getMessage());
+            return System.currentTimeMillis();
+        }
+    }
+
+    /**
      * Insert a single event (for new events that don't need upsert).
      */
     public void insert(AlarmEvent event, String domainId) {
         String collectionName = getCollectionName(domainId);
+        // Direct inserts are always new records, so assign a fresh serial.
+        if (event.getSerial() <= 0) {
+            event.setSerial(nextSerial());
+        }
         mongoTemplate.insert(event, collectionName);
     }
 
@@ -112,6 +173,23 @@ public class MongoBatchWriter {
     }
 
     /**
+     * Check whether a collection exists in MongoDB. Used to return a clear
+     * message to the frontend when the events collection has not been created
+     * yet (e.g. no events have been written since the engine started).
+     *
+     * @param collectionName the collection name to check
+     * @return true if the collection exists
+     */
+    public boolean collectionExists(String collectionName) {
+        try {
+            return mongoTemplate.collectionExists(collectionName);
+        } catch (Exception e) {
+            log.warn("Failed to check existence of collection '{}'", collectionName, e);
+            return false;
+        }
+    }
+
+    /**
      * Paged query over the current events collection using a full Query, which
      * supports arbitrary user-supplied MongoDB filter documents.
      *
@@ -131,8 +209,15 @@ public class MongoBatchWriter {
 
         long total = mongoTemplate.count(baseQuery, collectionName);
 
-        Query pageQuery = new Query();
-        pageQuery.getQueryObject().putAll(baseQuery.getQueryObject());
+        // Build the paged query from the filter. We must NOT call
+        // pageQuery.getQueryObject().putAll(...) because an empty Query returns
+        // an immutable EmptyDocument that throws UnsupportedOperationException.
+        // BasicQuery wraps a mutable Document filter and is safe for both empty
+        // and non-empty baseQuery.
+        org.bson.Document criteria = new org.bson.Document();
+        criteria.putAll(baseQuery.getQueryObject());
+
+        Query pageQuery = new org.springframework.data.mongodb.core.query.BasicQuery(criteria);
         pageQuery.skip((long) (safePage - 1) * safeSize).limit(safeSize);
         if (sortBy != null && !sortBy.isBlank()) {
             pageQuery.with(org.springframework.data.domain.Sort.by(
@@ -218,9 +303,11 @@ public class MongoBatchWriter {
                         Criteria.where("lastOccurrence").lt(cutoffMs)
                 )
         );
+        // Combine the two top-level criteria with $and. Adding two separate
+        // addCriteria() calls with two top-level $or would fail on BasicDocument
+        // (a second 'null' criteria cannot be added to an existing $or query).
         Query query = new Query();
-        query.addCriteria(resolved);
-        query.addCriteria(older);
+        query.addCriteria(new Criteria().andOperator(resolved, older));
 
         List<AlarmEvent> eligible = mongoTemplate.find(query, AlarmEvent.class, "events_current");
         int moved = 0;
@@ -236,15 +323,19 @@ public class MongoBatchWriter {
     }
 
     /**
-     * Move a single event from events_current to events_history (insert into
-     * history, then delete from current). Returns true on success.
+     * Move a single event from events_current to events_history.
+     * <p>
+     * Idempotent by identifier: the history write is an upsert (so a retry after
+     * a partial failure does not insert a duplicate), and only then is the
+     * current document removed. This avoids the classic non-atomic "insert then
+     * delete" race where a crash between the two steps leaves a duplicate.
      */
     public boolean moveToHistory(AlarmEvent event) {
         try {
-            mongoTemplate.insert(event, HISTORY_COLLECTION);
-            mongoTemplate.remove(
-                    Query.query(Criteria.where("identifier").is(event.getIdentifier())),
-                    "events_current");
+            Query byId = Query.query(Criteria.where("identifier").is(event.getIdentifier()));
+            // Upsert into history (idempotent), then remove from current.
+            mongoTemplate.upsert(byId, buildUpdate(event), HISTORY_COLLECTION);
+            mongoTemplate.remove(byId, "events_current");
             log.debug("Moved event {} to {}", event.getIdentifier(), HISTORY_COLLECTION);
             return true;
         } catch (Exception e) {
@@ -294,6 +385,36 @@ public class MongoBatchWriter {
         return new PagedResult<>(items, total, safePage, safeSize);
     }
 
+    /**
+     * Load every unresolved event. Used by the startup replay so that events
+     * left unresolved by a previous run can be re-parsed once the (possibly
+     * extended) script set is loaded.
+     *
+     * @return all documents in the unresolved collection
+     */
+    public List<UnresolvedEvent> findAllUnresolved() {
+        return mongoTemplate.find(new Query(), UnresolvedEvent.class, UNRESOLVED_COLLECTION);
+    }
+
+    /**
+     * Remove unresolved events by their Mongo <code>_id</code>. Used to clean
+     * up records after a successful re-parse (or after they have been
+     * re-inserted with an up-to-date reason).
+     *
+     * @param ids the <code>_id</code> strings of the records to remove
+     */
+    public void deleteUnresolved(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        try {
+            mongoTemplate.remove(
+                    Query.query(Criteria.where("_id").in(ids)),
+                    UNRESOLVED_COLLECTION);
+            log.info("Removed {} record(s) from {}", ids.size(), UNRESOLVED_COLLECTION);
+        } catch (Exception e) {
+            log.error("Failed to remove unresolved records from {}", UNRESOLVED_COLLECTION, e);
+        }
+    }
+
     // --- Internal ---
 
     private void singleUpsert(AlarmEvent event, String collectionName) {
@@ -319,6 +440,10 @@ public class MongoBatchWriter {
         update.set("tally", event.getTally());
         update.set("firstOccurrence", event.getFirstOccurrence());
         update.set("lastOccurrence", event.getLastOccurrence());
+        // serial is assigned once on first insert and never changed afterwards.
+        if (event.getSerial() > 0) {
+            update.setOnInsert("serial", event.getSerial());
+        }
         update.set("domainId", event.getDomainId());
         update.set("status", event.getStatus());
         update.set("alertKey", event.getAlertKey());
@@ -338,9 +463,9 @@ public class MongoBatchWriter {
         update.set("siteNum", event.getSiteNum());
         update.set("ticketId", event.getTicketId());
 
-        if (event.getClearTime() != null) update.set("clearTime", event.getClearTime());
-        if (event.getReceiveTime() != null) update.set("receiveTime", event.getReceiveTime());
-        if (event.getDeleteTime() != null) update.set("deleteTime", event.getDeleteTime());
+        if (event.getClearTime() > 0) update.set("clearTime", event.getClearTime());
+        if (event.getReceiveTime() > 0) update.set("receiveTime", event.getReceiveTime());
+        if (event.getDeleteTime() > 0) update.set("deleteTime", event.getDeleteTime());
         if (event.getMaintainId() != null) update.set("maintainId", event.getMaintainId());
         if (event.getMaintainName() != null) update.set("maintainName", event.getMaintainName());
         if (event.getRecoveryTime() > 0) update.set("recoveryTime", event.getRecoveryTime());

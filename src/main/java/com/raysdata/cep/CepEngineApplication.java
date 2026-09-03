@@ -10,6 +10,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import com.raysdata.cep.engine.UnresolvedReplayService;
 import com.raysdata.cep.groovy.ScriptRegistry;
 
 /**
@@ -25,12 +26,15 @@ public class CepEngineApplication implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(CepEngineApplication.class);
 
     private final ScriptRegistry scriptRegistry;
+    private final UnresolvedReplayService unresolvedReplayService;
 
     @Value("${cep.groovy.script-dir:./conf/groovy}")
     private String scriptDir;
 
-    public CepEngineApplication(ScriptRegistry scriptRegistry) {
+    public CepEngineApplication(ScriptRegistry scriptRegistry,
+                                UnresolvedReplayService unresolvedReplayService) {
         this.scriptRegistry = scriptRegistry;
+        this.unresolvedReplayService = unresolvedReplayService;
     }
 
     public static void main(String[] args) {
@@ -46,6 +50,11 @@ public class CepEngineApplication implements CommandLineRunner {
         } else {
             log.warn("Script directory not found: {}. Starting with empty script registry.", scriptDir);
         }
+
+        // Re-parse events left unresolved by a previous run now that the
+        // (possibly extended) script set is loaded.
+        unresolvedReplayService.replay();
+
         log.info("CEP Engine started successfully.");
     }
 }

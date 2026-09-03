@@ -32,8 +32,12 @@ event.setDomainId(metadata.get("domainId")?.toString() ?: "default")
 // agentType identifies the ingestion interface.
 String agentType = "syslog"
 
-// Node = syslog hostname (may be empty).
-String node = metadata.get("hostname")?.toString()?.trim()
+// Node = the device's source IP as observed by the collector (RawEvent.sourceIp),
+// falling back to the syslog header hostname when no source IP is present.
+String sourceIp = rawEvent.getSourceIp()?.toString()?.trim() ?: ""
+// Hostname from the syslog header (may be empty).
+String hostname = metadata.get("hostname")?.toString()?.trim() ?: ""
+String node = sourceIp ?: hostname
 
 // Alert group: app name or tag, else "syslog".
 String appName = metadata.get("appName")?.toString() ?: ""
@@ -42,19 +46,30 @@ String alertGroup = appName ?: (tag ?: "syslog")
 
 // Summary: rewrite from syslog fields (never carry vendor/NcKL text).
 String message = metadata.get("message")?.toString()?.trim() ?: ""
-String summary = message ?: "syslog message from ${node ?: 'unknown'}"
+String summary = message ?: "syslog message from ${hostname ?: sourceIp}"
 
 // Severity: map syslog severity 0-7 to CEP severity 0-5.
 int sev = mapSeverity(toInt(metadata.get("severity"), 6))
 event.setSeverity(sev)
 event.setOriginalSeverity(sev)
 
-// Timestamp: use the syslog header timestamp when present (originTimestamp set
-// by the daemon), else now.
-long ts = metadata.get("timestamp") != null ? parseMillis(metadata.get("timestamp").toString()) : 0
+// Occurrence timestamps = the moment the device emitted the syslog message.
+// The RFC3339 timestamp in the syslog HEADER equals the timestamp embedded in
+// the message body (RFC3164/5424), so it is authoritative and can be used
+// directly. Fall back to RawEvent.originTimestamp (also device-originated),
+// then to the local receive time.
+long ts = 0
+if (metadata.get("timestamp") != null) {
+    ts = parseMillis(metadata.get("timestamp").toString())
+}
+if (ts <= 0) {
+    try { if (rawEvent.getOriginTimestamp() > 0) ts = rawEvent.getOriginTimestamp() } catch (Exception ignored) {}
+}
 if (ts <= 0) ts = System.currentTimeMillis()
 event.setFirstOccurrence(ts)
 event.setLastOccurrence(ts)
+// receiveTime (local receipt time, epoch millis) is set centrally by the
+// engine after parsing, so we intentionally do NOT override it here.
 
 // eventType: default PROBLEM; daemon/collector may override via metadata.
 String eventType = metadata.get("eventType")?.toString()
@@ -64,8 +79,9 @@ event.setEventType(eventType ?: EventType.PROBLEM.code)
 String alertKey = "${appName ?: tag ?: 'syslog'}:${message}"
 event.setAlertKey(alertKey)
 
+// Node = source IP; NodeAlias = syslog header hostname.
 event.setNode(node)
-event.setNodeAlias(node)
+event.setNodeAlias(hostname)
 event.setAgentType(agentType)
 event.setAlertGroup(alertGroup)
 event.setSummary(summary)

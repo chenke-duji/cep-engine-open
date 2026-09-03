@@ -169,7 +169,7 @@ try {
 def rawDyn = event.getDynamicFields() ?: [:]
 rawDyn["raw_fields"] = [source: (rawEvent.getSource() ?: ""), sourceIp: (sourceIp ?: ""), trapOid: (trapOid ?: ""), fields: resolvedFields, varbinds: varbinds]
 event.setDynamicFields(rawDyn)
-event.setStatus("ACTIVE")
+event.setStatus("UnAcked")
 event.setEventClass("snmp_trap")
 event.setSpecificTrap(trapOid ?: "")
 event.setOriginalSeverity(event.getSeverity())

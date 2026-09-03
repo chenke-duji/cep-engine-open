@@ -3,7 +3,6 @@ package com.raysdata.cep.engine;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -46,8 +45,11 @@ public class DomainProcessor {
     /** Maintenance rules cache */
     private volatile List<MaintainRule> maintainRules = new ArrayList<>();
 
-    /** Script variables shared across hooks within one event processing */
-    private final ThreadLocal<Map<String, Object>> scriptVariables = ThreadLocal.withInitial(Map::of);
+    /** Script variables shared across hooks within one event processing.
+     *  Must be a mutable Map (hooks write into it); Map.of() is immutable and
+     *  would throw UnsupportedOperationException on the first put(). */
+    private final ThreadLocal<Map<String, Object>> scriptVariables =
+            ThreadLocal.withInitial(java.util.HashMap::new);
 
     // --- Constructor ---
 
@@ -119,12 +121,16 @@ public class DomainProcessor {
             return true;
         }
 
-        // Duplicate: merge into existing
-        existing.setTally(existing.getTally() + 1);
-        if (event.getSeverity() > existing.getSeverity()) {
-            existing.setSeverity(event.getSeverity());
+        // Duplicate: merge into existing. Synchronize on the shared event object
+        // so concurrent dedups of the same identifier do not lose tally/severity
+        // updates (read-modify-write race).
+        synchronized (existing) {
+            existing.setTally(existing.getTally() + 1);
+            if (event.getSeverity() > existing.getSeverity()) {
+                existing.setSeverity(event.getSeverity());
+            }
+            existing.setLastOccurrence(event.getLastOccurrence());
         }
-        existing.setLastOccurrence(event.getLastOccurrence());
         // Mark that we need to upsert the merged event
         synchronized (pendingUpserts) {
             pendingUpserts.add(existing);
@@ -160,7 +166,7 @@ public class DomainProcessor {
         // Mark the problem as resolved. status=Cleared is consistent with severity=0.
         problem.setEventType(EventType.RESOLUTION.getCode());
         problem.setStatus("Cleared");
-        problem.setClearTime(String.valueOf(now));
+        problem.setClearTime(now);
         problem.setRecoveryTime(now);
         problem.setSeverity(0);  // Clear severity
 
@@ -307,7 +313,6 @@ public class DomainProcessor {
     static class SlidingWindowCounter {
         private final long windowMillis;
         private final ConcurrentLinkedDeque<Long> timestamps = new ConcurrentLinkedDeque<>();
-        private final AtomicLong cachedCount = new AtomicLong(0);
 
         SlidingWindowCounter(long window, TimeUnit unit) {
             this.windowMillis = unit.toMillis(window);
@@ -321,7 +326,6 @@ public class DomainProcessor {
                 timestamps.pollFirst();
             }
             timestamps.addLast(now);
-            cachedCount.set(timestamps.size());
         }
 
         long count() {

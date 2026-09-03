@@ -130,15 +130,16 @@ public class UserPrefController {
         String username = authentication.getName();
         UserPref pref = userPrefStore.findDefault(UserPref.TYPE_TIMEFORMAT, username);
         if (pref == null || pref.getConfig() == null) {
-            // Fall back to server defaults
+            // Fall back to server defaults. Use dayjs-compatible pattern
+            // (YYYY, not yyyy) so the frontend renders it correctly.
             return ResponseEntity.ok(Map.of(
-                    "format", "yyyy-MM-dd HH:mm:ss",
+                    "format", "YYYY-MM-DD HH:mm:ss",
                     "timezone", java.util.TimeZone.getDefault().getID(),
                     "showTimezone", true
             ));
         }
         Map<String, Object> cfg = pref.getConfig();
-        String format = cfg.get("format") == null ? "yyyy-MM-dd HH:mm:ss" : cfg.get("format").toString();
+        String format = cfg.get("format") == null ? "YYYY-MM-DD HH:mm:ss" : cfg.get("format").toString();
         String tz = cfg.get("timezone") == null ? java.util.TimeZone.getDefault().getID() : cfg.get("timezone").toString();
         boolean showTz = cfg.get("showTimezone") == null || Boolean.TRUE.equals(cfg.get("showTimezone"));
         return ResponseEntity.ok(Map.of("format", format, "timezone", tz, "showTimezone", showTz));

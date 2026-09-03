@@ -108,6 +108,6 @@ event.setLastOccurrence(now)
 event.setRawEvent(rawText)
 
 // Set status
-event.setStatus("ACTIVE")
+event.setStatus("UnAcked")
 
 return event

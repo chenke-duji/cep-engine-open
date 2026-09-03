@@ -15,6 +15,10 @@ import java.util.Map;
 public class AlarmEvent {
 
     private String identifier;
+    /** Monotonic, server-assigned numeric id for a record. The string
+     *  {@code identifier} can be long, so this compact long gives a simple,
+     *  stable unique key (assigned once on first insert, never changes). */
+    private long serial;
     private String node;
     private String nodeAlias;
     private int severity;
@@ -32,9 +36,9 @@ public class AlarmEvent {
     private String eventEnterprise;
     private String alertGroup;
     private String alertGroupName;
-    private String clearTime;
-    private String receiveTime;
-    private String deleteTime;
+    private long clearTime;
+    private long receiveTime;
+    private long deleteTime;
     private String vendor;
     private String suppressLevel;
     private String escalateLevel;
@@ -57,6 +61,14 @@ public class AlarmEvent {
 
     public void setIdentifier(String identifier) {
         this.identifier = identifier;
+    }
+
+    public long getSerial() {
+        return serial;
+    }
+
+    public void setSerial(long serial) {
+        this.serial = serial;
     }
 
     public String getNode() {
@@ -195,27 +207,27 @@ public class AlarmEvent {
         this.alertGroupName = alertGroupName;
     }
 
-    public String getClearTime() {
+    public long getClearTime() {
         return clearTime;
     }
 
-    public void setClearTime(String clearTime) {
+    public void setClearTime(long clearTime) {
         this.clearTime = clearTime;
     }
 
-    public String getReceiveTime() {
+    public long getReceiveTime() {
         return receiveTime;
     }
 
-    public void setReceiveTime(String receiveTime) {
+    public void setReceiveTime(long receiveTime) {
         this.receiveTime = receiveTime;
     }
 
-    public String getDeleteTime() {
+    public long getDeleteTime() {
         return deleteTime;
     }
 
-    public void setDeleteTime(String deleteTime) {
+    public void setDeleteTime(long deleteTime) {
         this.deleteTime = deleteTime;
     }
 

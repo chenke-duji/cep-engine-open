@@ -9,10 +9,12 @@
       v-loading="loading"
       row-key="identifier"
       height="100%"
+      resizable
       highlight-current-row
       :row-class-name="rowClassName"
       @selection-change="onSelectionChange"
       @row-click="onRowClick"
+      @row-dblclick="onRowDblClick"
     >
       <el-table-column type="selection" width="42" :selectable="() => true" />
       <el-table-column
@@ -52,6 +54,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'selection-change', rows: AlarmEvent[]): void
   (e: 'row-click', row: AlarmEvent): void
+  (e: 'row-dblclick', row: AlarmEvent): void
   (e: 'context-menu', evt: MouseEvent, rows: AlarmEvent[]): void
 }>()
 
@@ -59,11 +62,16 @@ const tableRef = ref<ComponentPublicInstance & { clearSelection: () => void }>()
 
 // Severity column heuristic: field name contains 'severity'
 const SEVERITY_FIELDS = new Set(['severity', 'originalSeverity'])
-// Timestamp fields shown with the user-selected format
+// Timestamp fields shown with the user-selected format. All are epoch-millis
+// values stored either as a JS number (long) or a numeric string (e.g.
+// receiveTime/clearTime/deleteTime are String.valueOf(millis) server-side).
 const TIMESTAMP_FIELDS = new Set([
   'firstOccurrence',
   'lastOccurrence',
   'recoveryTime',
+  'receiveTime',
+  'clearTime',
+  'deleteTime',
 ])
 
 function isSeverityColumn(field: string) {
@@ -109,6 +117,10 @@ function onSelectionChange(rows: AlarmEvent[]) {
 
 function onRowClick(row: AlarmEvent) {
   emit('row-click', row)
+}
+
+function onRowDblClick(row: AlarmEvent) {
+  emit('row-dblclick', row)
 }
 
 function onContextMenu(evt: MouseEvent) {

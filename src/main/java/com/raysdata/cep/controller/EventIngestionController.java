@@ -2,9 +2,14 @@ package com.raysdata.cep.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+
+import jakarta.validation.Valid;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,8 +18,6 @@ import com.raysdata.cep.engine.TransportDeduplicator;
 import com.raysdata.cep.model.RawEvent;
 import com.raysdata.cep.store.MongoBatchWriter;
 import com.raysdata.cep.model.AlarmEvent;
-
-import com.google.gson.Gson;
 
 /**
  * REST API for event ingestion and querying.
@@ -29,18 +32,21 @@ import com.google.gson.Gson;
 public class EventIngestionController {
 
     private static final Logger log = LoggerFactory.getLogger(EventIngestionController.class);
-    private static final Gson gson = new Gson();
 
     private final EventProcessingChain processingChain;
     private final TransportDeduplicator transportDeduplicator;
     private final MongoBatchWriter mongoBatchWriter;
+    // LOG-08: cap concurrent event processing to avoid unbounded virtual threads.
+    private final Semaphore ingestSemaphore;
 
     public EventIngestionController(EventProcessingChain processingChain,
                                     TransportDeduplicator transportDeduplicator,
-                                    MongoBatchWriter mongoBatchWriter) {
+                                    MongoBatchWriter mongoBatchWriter,
+                                    @Value("${cep.ingest.max-concurrency:1000}") int maxConcurrency) {
         this.processingChain = processingChain;
         this.transportDeduplicator = transportDeduplicator;
         this.mongoBatchWriter = mongoBatchWriter;
+        this.ingestSemaphore = new Semaphore(Math.max(maxConcurrency, 1));
     }
 
     /**
@@ -51,7 +57,7 @@ public class EventIngestionController {
      * Body: RawEvent JSON
      */
     @PostMapping("/events")
-    public ResponseEntity<Map<String, Object>> ingestEvent(@RequestBody RawEvent rawEvent) {
+    public ResponseEntity<Map<String, Object>> ingestEvent(@Valid @RequestBody RawEvent rawEvent) {
         log.debug("Ingesting event from source: {}, ip: {}",
                 rawEvent.getSource(), rawEvent.getSourceIp());
 
@@ -64,8 +70,24 @@ public class EventIngestionController {
             ));
         }
 
-        // Process on a virtual thread
-        Thread.startVirtualThread(() -> processingChain.process(rawEvent));
+        // Process on a virtual thread, bounded by the semaphore. If the pipeline
+        // is saturated, reject with 429 so collectors back off instead of
+        // spawning unbounded threads.
+        if (!ingestSemaphore.tryAcquire()) {
+            log.warn("Ingestion saturated; rejecting event from {}", rawEvent.getSourceIp());
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "status", "rejected",
+                    "reason", "too many concurrent events",
+                    "source", rawEvent.getSource()
+            ));
+        }
+        Thread.startVirtualThread(() -> {
+            try {
+                processingChain.process(rawEvent);
+            } finally {
+                ingestSemaphore.release();
+            }
+        });
 
         return ResponseEntity.ok(Map.of(
                 "status", "accepted",
@@ -80,25 +102,38 @@ public class EventIngestionController {
      * Body: [RawEvent, ...]
      */
     @PostMapping("/events/batch")
-    public ResponseEntity<Map<String, Object>> ingestBatch(@RequestBody List<RawEvent> events) {
+    public ResponseEntity<Map<String, Object>> ingestBatch(@Valid @RequestBody List<@Valid RawEvent> events) {
         log.debug("Ingesting batch of {} events", events.size());
 
         int accepted = 0;
         int deduplicated = 0;
+        int rejected = 0;
 
         for (RawEvent event : events) {
             if (transportDeduplicator.isDuplicate(event)) {
                 deduplicated++;
                 continue;
             }
-            Thread.startVirtualThread(() -> processingChain.process(event));
+            if (!ingestSemaphore.tryAcquire()) {
+                rejected++;
+                continue;
+            }
+            final RawEvent ev = event;
+            Thread.startVirtualThread(() -> {
+                try {
+                    processingChain.process(ev);
+                } finally {
+                    ingestSemaphore.release();
+                }
+            });
             accepted++;
         }
 
         return ResponseEntity.ok(Map.of(
                 "status", "accepted",
                 "count", accepted,
-                "deduplicated", deduplicated
+                "deduplicated", deduplicated,
+                "rejected", rejected
         ));
     }
 

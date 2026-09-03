@@ -32,12 +32,18 @@ public class JwtUtil {
     public JwtUtil(@Value("${cep.security.jwt.secret:}") String secret,
                    @Value("${cep.security.jwt.expiration-ms:28800000}") long expirationMs,
                    @Value("${cep.security.jwt.issuer:cep-engine}") String issuer) {
-        byte[] keyBytes = (secret == null || secret.isBlank())
-                ? "cep-engine-default-insecure-key-change-me".getBytes(StandardCharsets.UTF_8)
-                : secret.getBytes(StandardCharsets.UTF_8);
+        // SEC-05: refuse to start with a missing or weak JWT secret instead of
+        // silently falling back to a predictable key that lets anyone forge tokens.
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "cep.security.jwt.secret is not configured. Set a strong secret "
+                            + "(>= 32 bytes) via CEP_JWT_SECRET before starting the engine.");
+        }
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
-            log.warn("JWT secret is shorter than 32 bytes; tokens may be insecure. "
-                    + "Configure cep.security.jwt.secret with a strong value.");
+            throw new IllegalStateException(
+                    "cep.security.jwt.secret is too short (" + keyBytes.length
+                            + " bytes). Use at least 32 bytes for HMAC-SHA signing.");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
         this.expirationMs = expirationMs;

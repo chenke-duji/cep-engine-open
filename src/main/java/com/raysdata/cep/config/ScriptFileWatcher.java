@@ -36,6 +36,9 @@ public class ScriptFileWatcher {
     @Value("${cep.groovy.script-dir:./conf/groovy}")
     private String scriptDir;
 
+    @Value("${cep.groovy.file-watch.debounce-ms:1000}")
+    private long debounceMs;
+
     private WatchService watchService;
     private ExecutorService executor;
 
@@ -92,7 +95,7 @@ public class ScriptFileWatcher {
 
     private void watchLoop() {
         long lastReload = 0;
-        long debounceMs = 1000; // Debounce: wait 1s after last change before reloading
+        // Debounce: wait debounceMs after last change before reloading (configurable).
 
         while (!Thread.currentThread().isInterrupted()) {
             try {

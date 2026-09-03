@@ -22,6 +22,10 @@
       <div v-if="operations.length === 0" class="context-menu-item disabled">
         无可执行操作
       </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" @click="onDetail">
+        <span class="detail-icon">i</span> 详细信息
+      </div>
     </div>
   </Teleport>
 </template>
@@ -42,6 +46,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select', operation: Operation): void
+  (e: 'detail'): void
   (e: 'close'): void
 }>()
 
@@ -86,6 +91,11 @@ function onClick(op: Operation) {
   if (!isEnabled(op)) return
   emit('select', op)
 }
+
+/** Open the detail panel for the current selection (always available). */
+function onDetail() {
+  emit('detail')
+}
 </script>
 
 <style scoped>
@@ -95,5 +105,23 @@ function onClick(op: Operation) {
   color: var(--cep-text-muted);
   border-bottom: 1px solid #2a3446;
   margin-bottom: 4px;
+}
+.context-menu-divider {
+  height: 1px;
+  background: #2a3446;
+  margin: 4px 0;
+}
+.detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: italic;
 }
 </style>

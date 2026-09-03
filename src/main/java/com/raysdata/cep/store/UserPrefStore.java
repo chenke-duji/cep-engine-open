@@ -56,7 +56,11 @@ public class UserPrefStore {
 
     public UserPref update(UserPref pref) {
         pref.setUpdatedAt(System.currentTimeMillis());
-        Query query = Query.query(Criteria.where("id").is(pref.getId()));
+        // NOTE: must query on "_id" (not "id"). The class id field is persisted
+        // as the Mongo _id; Criteria.where("id") is a raw-field query that does
+        // not map to _id, so updateFirst would silently match ZERO documents and
+        // the update would never persist.
+        Query query = Query.query(Criteria.where("_id").is(pref.getId()));
         Update update = new Update()
                 .set("name", pref.getName())
                 .set("config", pref.getConfig())
@@ -68,7 +72,7 @@ public class UserPrefStore {
     }
 
     public void delete(String id) {
-        mongoTemplate.remove(Query.query(Criteria.where("id").is(id)), COLLECTION);
+        mongoTemplate.remove(Query.query(Criteria.where("_id").is(id)), COLLECTION);
     }
 
     /**

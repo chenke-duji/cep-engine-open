@@ -15,9 +15,14 @@ import org.springframework.stereotype.Component;
  * selection of events via the right-click context menu. The frontend only sends
  * an operation name plus identifiers, never raw update content, so the set of
  * writable fields is strictly limited by this configuration.
+ * <p>
+ * NOTE: the prefix is {@code cep} (not {@code cep.operations}) so that the
+ * {@code operations} field binds to the {@code cep.operations} list in YAML.
+ * Using {@code cep.operations} as the prefix would expect
+ * {@code cep.operations.operations} and silently leave the list empty.
  */
 @Component
-@ConfigurationProperties(prefix = "cep.operations")
+@ConfigurationProperties(prefix = "cep")
 public class EventOperationProperties {
 
     private List<Operation> operations = new ArrayList<>();
