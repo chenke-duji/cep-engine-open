@@ -42,6 +42,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   context menu with configured operations, and dialogs for custom views
   (column model), custom filters (MongoDB query) and timestamp format/timezone.
 
+### Frontend security & engineering hardening (cep-web)
+
+Security:
+
+- **JWT in-memory storage**: the access token is now held in a module-level
+  variable and is never written to `localStorage`/`sessionStorage`, eliminating
+  XSS token theft via Web Storage APIs. (Trade-off: page refresh re-prompts login.)
+- **NoSQL injection guard**: the custom-filter dialog now validates user queries
+  against an operator allow-list, rejecting dangerous operators (`$where`,
+  `$function`, …).
+- **ReDoS guard**: free-text node filters escape regex metacharacters.
+- **CSRF defense-in-depth**: the HTTP client sends an `X-Requested-With` header
+  on every request (cross-site form submissions cannot set custom headers).
+- **Login brute-force throttling**: 5 consecutive failures trigger a 30 s cooldown.
+- **Safe error surface**: raw backend error messages are mapped to friendly
+  text; original errors are logged to the console only.
+- **Redirect validation**: post-login redirect targets are restricted to
+  same-origin paths (`/...`, rejecting `//`).
+
+Deployment:
+
+- **HTTPS/TLS**: Nginx config now serves over TLS (`listen 9443 ssl`) with a
+  9988→9443 redirect, `Strict-Transport-Security`, and bundled self-signed certs
+  under `deploy/tls/` (replace with CA-signed certs in production).
+
+Engineering:
+
+- **Tests**: Vitest + @vue/test-utils introduced; unit tests cover token expiry,
+  context-menu condition parsing, and timestamp formatting.
+- **Lint/format**: ESLint (eslint:recommended + vue3-recommended +
+  @typescript-eslint + prettier) and Prettier added, with `lint`/`format` scripts.
+- **Strict TypeScript**: `noUnusedLocals`, `noUnusedParameters`,
+  `noImplicitReturns`, `noFallthroughCasesInSwitch` enabled.
+- **i18n**: vue-i18n plumbing added (zh-CN baseline); key UI surfaces localized.
+- **Refactor**: `EventConsoleView` split into five composables
+  (`useEventList`, `useEventOperations`, `useFilterManagement`,
+  `useViewManagement`, `useTimeFormat`); timestamp preferences moved from a
+  module singleton into a Pinia store.
+- **Error boundary**: unhandled promise rejections are now captured globally.
+- **Accessibility**: context menu uses `role="menu"`/`role="menuitem"`.
+
 ---
 
 ## Problem/Resolution logic rework

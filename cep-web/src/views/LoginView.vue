@@ -3,8 +3,8 @@
     <div class="login-panel panel">
       <div class="login-brand">
         <div class="logo">CEP</div>
-        <h1>CEP 事件管理控制台</h1>
-        <p>集中式事件管理平台 · 事件接入与处理引擎</p>
+        <h1>{{ t('login.title') }}</h1>
+        <p>{{ t('app.subtitle') }}</p>
       </div>
       <el-form
         :model="form"
@@ -15,7 +15,7 @@
         <el-form-item>
           <el-input
             v-model="form.username"
-            placeholder="用户名"
+            :placeholder="t('login.username')"
             :prefix-icon="User"
             autocomplete="username"
           />
@@ -24,7 +24,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码"
+            :placeholder="t('login.password')"
             :prefix-icon="Lock"
             show-password
             autocomplete="current-password"
@@ -36,26 +36,29 @@
             type="primary"
             native-type="submit"
             :loading="loading"
+            :disabled="cooldown > 0"
             class="login-btn"
           >
-            登 录
+            {{ cooldown > 0 ? t('login.cooldown', { seconds: cooldown }) : t('login.submit') }}
           </el-button>
         </el-form-item>
       </el-form>
       <div class="login-hint">
-        默认管理员：admin / admin（请在生产环境立即修改）
+        {{ t('login.hint') }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
+const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -63,7 +66,38 @@ const auth = useAuthStore()
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 
+// ---- Brute-force protection (client-side) ----
+const MAX_ATTEMPTS = 5
+const COOLDOWN_SECONDS = 30
+const failCount = ref(0)
+const cooldown = ref(0)
+let cooldownTimer: ReturnType<typeof setInterval> | undefined
+
+function startCooldown() {
+  cooldown.value = COOLDOWN_SECONDS
+  cooldownTimer = setInterval(() => {
+    cooldown.value--
+    if (cooldown.value <= 0) {
+      if (cooldownTimer) clearInterval(cooldownTimer)
+      cooldownTimer = undefined
+    }
+  }, 1000)
+}
+
+onUnmounted(() => {
+  if (cooldownTimer) clearInterval(cooldownTimer)
+})
+
+/** Validate that the redirect target is a safe same-origin path. */
+function safeRedirect(redirect: string): string {
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+  return '/'
+}
+
 async function onSubmit() {
+  if (cooldown.value > 0) return
   if (!form.username || !form.password) {
     ElMessage.warning('请输入用户名和密码')
     return
@@ -71,11 +105,17 @@ async function onSubmit() {
   loading.value = true
   try {
     await auth.login(form.username, form.password)
+    failCount.value = 0
     ElMessage.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/'
+    const redirect = safeRedirect((route.query.redirect as string) || '/')
     router.replace(redirect)
   } catch {
-    // error message already shown by interceptor
+    failCount.value++
+    if (failCount.value >= MAX_ATTEMPTS) {
+      ElMessage.warning(`登录失败次数过多，请等待 ${COOLDOWN_SECONDS} 秒后重试`)
+      startCooldown()
+      failCount.value = 0
+    }
   } finally {
     loading.value = false
   }

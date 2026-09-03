@@ -11,8 +11,8 @@ export interface EventListQuery {
 }
 
 /** Paged event list with an optional custom MongoDB filter. */
-export async function fetchEvents(q: EventListQuery = {}): Promise<PagedResult<AlarmEvent>> {
-  const res = await http.get('/events/list', { params: q })
+export async function fetchEvents(q: EventListQuery = {}, signal?: AbortSignal): Promise<PagedResult<AlarmEvent>> {
+  const res = await http.get('/events/list', { params: q, signal })
   return res.data as PagedResult<AlarmEvent>
 }
 

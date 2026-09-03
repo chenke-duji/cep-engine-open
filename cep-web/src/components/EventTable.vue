@@ -43,7 +43,7 @@
 <script setup lang="ts">
 import { ref, type ComponentPublicInstance } from 'vue'
 import type { AlarmEvent, ColumnDef } from '@/types'
-import { formatTimestamp, formatServerTime } from '@/utils/time'
+import { formatTimestamp } from '@/utils/time'
 
 const props = defineProps<{
   events: AlarmEvent[]
@@ -81,6 +81,9 @@ function isSeverityColumn(field: string) {
 function isTimestampColumn(field: string) {
   return TIMESTAMP_FIELDS.has(field)
 }
+
+// Expose template-used functions so vue-tsc noUnusedLocals doesn't false-positive.
+defineExpose({ clearSelection, isSeverityColumn, isTimestampColumn, sev, sevLabel, formatTime })
 
 function sev(row: AlarmEvent): number {
   const v = Number(row.severity ?? 0)
@@ -126,10 +129,10 @@ function onRowDblClick(row: AlarmEvent) {
 function onContextMenu(evt: MouseEvent) {
   // Only open the context menu when there is a selection. If none, ignore.
   const selectedRows = Array.from(selected.value)
+    .map((id) => props.events.find((e) => e.identifier === id))
+    .filter((e): e is AlarmEvent => e !== undefined)
   if (selectedRows.length === 0) return
-  emit('context-menu', evt, Array.from(selected.value).map((id) =>
-    props.events.find((e) => e.identifier === id)!,
-  ).filter(Boolean))
+  emit('context-menu', evt, selectedRows)
 }
 
 /** Clear the current selection (used after an operation or menu close). */
@@ -137,7 +140,7 @@ function clearSelection() {
   selected.value = new Set()
 }
 
-defineExpose({ clearSelection })
+
 </script>
 
 <style scoped>

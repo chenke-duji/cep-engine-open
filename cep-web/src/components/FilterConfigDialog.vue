@@ -52,7 +52,34 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
-const isAdmin = auth.isAdmin
+const isAdmin = computed(() => auth.isAdmin)
+
+// Allowed MongoDB query operators — deny dangerous ones like $where, $function.
+const ALLOWED_OPERATORS = new Set([
+  '$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin',
+  '$regex', '$options', '$exists', '$type', '$and', '$or', '$not',
+  '$nor', '$size', '$all', '$mod',
+])
+
+/** Recursively validate that the parsed query only uses allowed operators. */
+function validateQuery(obj: unknown): string | null {
+  if (obj === null || typeof obj !== 'object') return null
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const err = validateQuery(item)
+      if (err) return err
+    }
+    return null
+  }
+  for (const key of Object.keys(obj as Record<string, unknown>)) {
+    if (key.startsWith('$') && !ALLOWED_OPERATORS.has(key)) {
+      return `不允许使用操作符: ${key}`
+    }
+    const err = validateQuery((obj as Record<string, unknown>)[key])
+    if (err) return err
+  }
+  return null
+}
 
 const form = reactive<{
   name: string
@@ -97,11 +124,17 @@ function save() {
     ElMessage.warning('请输入 MongoDB 查询语句')
     return
   }
-  // Validate it parses as JSON before saving.
+  // Validate it parses as JSON and only uses allowed operators.
+  let parsed: unknown
   try {
-    JSON.parse(form.query)
+    parsed = JSON.parse(form.query)
   } catch {
     ElMessage.error('查询语句不是合法的 JSON')
+    return
+  }
+  const queryErr = validateQuery(parsed)
+  if (queryErr) {
+    ElMessage.error(queryErr)
     return
   }
   emit('save', {

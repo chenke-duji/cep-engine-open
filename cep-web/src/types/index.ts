@@ -113,7 +113,7 @@ export interface OperateResult {
 
 /** Current authenticated user. */
 export interface CurrentUser {
-  token: string
+  token?: string
   username: string
   displayName: string
   role: string

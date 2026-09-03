@@ -103,7 +103,7 @@
       :selected-count="selectedRows.length"
       :loading="operating"
       @close="confirm.visible = false"
-      @confirm="executeOperation"
+      @confirm="onExecuteOperation"
     />
 
     <!-- View config dialog -->
@@ -113,7 +113,7 @@
       :view="viewDialog.editing"
       :loading="viewDialog.loading"
       @close="viewDialog.visible = false"
-      @save="saveView"
+      @save="onSaveView"
     />
 
     <!-- Filter config dialog -->
@@ -152,23 +152,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import {
   Edit, Filter, Refresh, Clock, User, Plus,
 } from '@element-plus/icons-vue'
-import type {
-  AlarmEvent, ColumnDef, Operation, ViewConfig,
-  FilterConfig, TimeFormatConfig, UserPref,
-} from '@/types'
-import { fetchEvents, fetchOperations, operate } from '@/api/event'
-import {
-  fetchPrefs, createPref, updatePref, deletePref, fetchDefaultTimeFormat,
-} from '@/api/userprefs'
-import { setTimeFormat, getTimeFormat } from '@/utils/time'
+import type { ViewConfig, FilterConfig, TimeFormatConfig } from '@/types'
 import { fetchBuildInfo, type BuildInfo } from '@/api/version'
 import { useAuthStore } from '@/stores/auth'
+import { useEventList } from '@/composables/useEventList'
+import { useEventOperations } from '@/composables/useEventOperations'
+import { useViewManagement } from '@/composables/useViewManagement'
+import { useFilterManagement } from '@/composables/useFilterManagement'
+import { useTimeFormat } from '@/composables/useTimeFormat'
 import EventTable from '@/components/EventTable.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import OperationContextMenu from '@/components/OperationContextMenu.vue'
@@ -185,338 +182,54 @@ const auth = useAuthStore()
 // ---- View switcher: 'events' | 'unresolved' ----
 const activeView = ref<'events' | 'unresolved'>('events')
 
-// ---- Event list state ----
-const events = ref<AlarmEvent[]>([])
-const total = ref(0)
-const page = ref(1)
-const pageSize = ref(50)
-const loading = ref(false)
-const autoRefresh = ref(false)
-const currentFilter = ref<string | undefined>(undefined)
-// Free-text keyword matched locally across ALL fields of the currently loaded
-// rows (no extra backend request).
-const filterKeyword = ref('')
-let refreshTimer: number | undefined
-
-/** Rows actually shown in the table: server rows filtered by the local keyword. */
-const visibleEvents = computed<AlarmEvent[]>(() => {
-  const kw = filterKeyword.value
-  if (!kw) return events.value
-  const lower = kw.toLowerCase()
-  return events.value.filter((e) => keywordMatches(e, lower))
-})
-
-/** Does any scalar field of the event contain the (lower-cased) keyword? */
-function keywordMatches(e: AlarmEvent, lower: string): boolean {
-  const val: unknown[] = [e]
-  while (val.length) {
-    const item = val.pop()
-    if (item == null) continue
-    if (typeof item === 'string') {
-      if (item.toLowerCase().includes(lower)) return true
-      continue
-    }
-    if (typeof item === 'number' || typeof item === 'boolean') {
-      if (String(item).toLowerCase().includes(lower)) return true
-      continue
-    }
-    if (typeof item === 'object') {
-      // Walk dynamicFields / nested objects without infinite recursion.
-      for (const v of Object.values(item as Record<string, unknown>)) {
-        val.push(v)
-      }
-    }
-  }
-  return false
-}
-
-// ---- Views ----
-const views = ref<UserPref[]>([])
-const currentViewId = ref<string>('')
-const activeColumns = computed<ColumnDef[]>(() => {
-  if (!currentViewId.value) return defaultColumns()
-  const v = views.value.find((x) => x.id === currentViewId.value)
-  const cols = v?.config?.columns as ColumnDef[] | undefined
-  return cols && cols.length ? cols : defaultColumns()
-})
-
-// ---- Build info (footer) ----
-const buildInfo = ref<BuildInfo | null>(null)
-
-// ---- Operations & selection ----
-const operations = ref<Operation[]>([])
-const selectedRows = ref<AlarmEvent[]>([])
-const menu = reactive<{ visible: boolean; x: number; y: number }>({
-  visible: false, x: 0, y: 0,
-})
-const confirm = reactive<{ visible: boolean; operation: Operation | null }>({
-  visible: false, operation: null,
-})
-const operating = ref(false)
-const detailDialog = reactive<{ visible: boolean; event: AlarmEvent | null }>({
-  visible: false, event: null,
-})
-
-// ---- Dialogs ----
-const viewDialog = reactive<{ visible: boolean; editing: ViewConfig | null; loading: boolean; dialogKey: number }>({
-  visible: false, editing: null, loading: false, dialogKey: 0,
-})
-const filterDialog = reactive<{ visible: boolean; editing: FilterConfig | null; loading: boolean }>({
-  visible: false, editing: null, loading: false,
-})
-const timeDialog = reactive<{ visible: boolean; loading: boolean }>({ visible: false, loading: false })
-const timeState = ref(getTimeFormat())
-
+// ---- Table ref (shared by event list & operations) ----
 const tableRef = ref<InstanceType<typeof EventTable>>()
 const filterBarRef = ref<InstanceType<typeof FilterBar>>()
 
-function defaultColumns(): ColumnDef[] {
-  return [
-    { field: 'node', title: '节点', width: 160 },
-    { field: 'severity', title: '级别', width: 120 },
-    { field: 'summary', title: '摘要', width: 260 },
-    { field: 'status', title: '状态', width: 100 },
-    { field: 'lastOccurrence', title: '最近发生', width: 180, sortable: true },
-  ]
-}
+// ---- Composables ----
+const ops = useEventOperations()
+const {
+  operations, selectedRows, menu, confirm, operating, detailDialog,
+  loadOperations, onSelectionChange, onContextMenu, closeMenu,
+  onMenuSelect, onMenuDetail, onRowDblClick, executeOperation,
+} = ops
 
-function viewLabel(v: UserPref) {
-  return `${v.name}${v.isPublic ? '（公共）' : ''}`
-}
+const eventList = useEventList({
+  selectedRows,
+  tableRef: tableRef as unknown as import('vue').Ref<{ clearSelection: () => void } | undefined>,
+})
+const {
+  total, page, pageSize, loading, autoRefresh,
+  visibleEvents, loadEvents, onSearch, onSizeChange,
+} = eventList
 
-// ---- Data loading ----
-async function loadOperations() {
-  try {
-    operations.value = await fetchOperations()
-  } catch {
-    operations.value = []
-  }
-}
+const {
+  views, currentViewId, activeColumns, viewDialog,
+  viewLabel, loadViews, openViewDialog, openEditViewDialog, saveView,
+} = useViewManagement()
 
-async function loadViews() {
-  try {
-    views.value = await fetchPrefs('view')
-    if (!currentViewId.value && views.value.length) {
-      currentViewId.value = views.value[0].id
-    }
-  } catch {
-    views.value = []
-  }
-}
+const {
+  filterDialog, openFilterDialog, saveFilter,
+} = useFilterManagement()
 
-async function loadTimeFormat() {
-  try {
-    const t = await fetchDefaultTimeFormat()
-    setTimeFormat(t.format, t.timezone, t.showTimezone)
-    timeState.value = { format: t.format, timezone: t.timezone, showTimezone: t.showTimezone }
-  } catch {
-    timeState.value = getTimeFormat()
-  }
-}
+const {
+  timeDialog, timeState, loadTimeFormat, openTimeDialog, applyTimeFormat,
+} = useTimeFormat()
 
-async function loadEvents() {
-  loading.value = true
-  try {
-    const res = await fetchEvents({
-      page: page.value,
-      size: pageSize.value,
-      filter: currentFilter.value,
-      sortBy: 'lastOccurrence',
-      sortDesc: true,
-    })
-    events.value = res.items
-    total.value = res.total
-    selectedRows.value = []
-    tableRef.value?.clearSelection()
-    if (res.collectionExists === false) {
-      ElMessage.warning(res.message || '事件集合尚不存在，可能还没有 trap/syslog 事件写入。')
-    }
-  } catch {
-    // message handled by interceptor
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(criteria: { filter?: string; keyword?: string }) {
-  currentFilter.value = criteria.filter
-  filterKeyword.value = criteria.keyword || ''
-  page.value = 1
-  loadEvents()
-}
-
-function onSizeChange() {
-  page.value = 1
-  loadEvents()
-}
+// ---- Build info (footer) ----
+const buildInfo = ref<BuildInfo | null>(null)
 
 function onViewChange() {
   loadEvents()
 }
 
-// ---- Selection & context menu ----
-function onSelectionChange(rows: AlarmEvent[]) {
-  selectedRows.value = rows
+// ---- Wrapper functions for composable callbacks ----
+function onExecuteOperation() {
+  executeOperation(loadEvents)
 }
 
-function onContextMenu(evt: MouseEvent, rows: AlarmEvent[]) {
-  selectedRows.value = rows
-  menu.x = evt.clientX
-  menu.y = evt.clientY
-  menu.visible = true
-}
-
-function closeMenu() {
-  menu.visible = false
-}
-
-function onMenuSelect(op: Operation) {
-  closeMenu()
-  confirm.operation = op
-  confirm.visible = true
-}
-
-/** Show the detail dialog for the selected event(s). */
-function onMenuDetail() {
-  closeMenu()
-  if (selectedRows.value.length === 0) return
-  detailDialog.event = selectedRows.value[0]
-  detailDialog.visible = true
-}
-
-/** Double-clicking a row opens the detail dialog for that row. */
-function onRowDblClick(row: AlarmEvent) {
-  detailDialog.event = row
-  detailDialog.visible = true
-}
-
-async function executeOperation() {
-  if (!confirm.operation || selectedRows.value.length === 0) return
-  operating.value = true
-  try {
-    const ids = selectedRows.value.map((r) => r.identifier)
-    const res = await operate(confirm.operation.name, ids)
-    ElMessage.success(
-      `操作成功：匹配 ${res.matched} 条，更新 ${res.modified} 条`,
-    )
-    confirm.visible = false
-    loadEvents()
-  } catch {
-    // handled by interceptor
-  } finally {
-    operating.value = false
-  }
-}
-
-// ---- View management ----
-function openViewDialog() {
-  viewDialog.editing = null
-  viewDialog.dialogKey++
-  viewDialog.visible = true
-}
-
-/** Open the dialog in "edit" mode for the currently selected view. */
-function openEditViewDialog() {
-  if (!currentViewId.value) return
-  const v = views.value.find((x) => x.id === currentViewId.value)
-  if (!v) return
-  viewDialog.editing = {
-    id: v.id,
-    name: v.name,
-    isDefault: v.isDefault,
-    isPublic: v.isPublic,
-    config: JSON.parse(JSON.stringify(v.config || { columns: [] })) as ViewConfig['config'],
-  }
-  viewDialog.dialogKey++
-  viewDialog.visible = true
-}
-
-async function saveView(data: ViewConfig) {
-  viewDialog.loading = true
-  try {
-    if (data.id) {
-      await updatePref(data.id, {
-        name: data.name, isDefault: data.isDefault, isPublic: data.isPublic,
-        config: data.config,
-      })
-    } else {
-      const created = await createPref({
-        type: 'view', name: data.name, isDefault: data.isDefault,
-        isPublic: data.isPublic, config: data.config,
-      })
-      currentViewId.value = created.id
-    }
-    ElMessage.success('视图已保存')
-    viewDialog.visible = false
-    await loadViews()
-    loadEvents()
-  } catch {
-    // handled
-  } finally {
-    viewDialog.loading = false
-  }
-}
-
-// ---- Filter management ----
-function openFilterDialog() {
-  filterDialog.editing = null
-  filterDialog.visible = true
-}
-
-async function saveFilter(data: FilterConfig) {
-  filterDialog.loading = true
-  try {
-    if (data.id) {
-      await updatePref(data.id, {
-        name: data.name, isDefault: data.isDefault, isPublic: data.isPublic,
-        config: data.config,
-      })
-    } else {
-      await createPref({
-        type: 'filter', name: data.name, isDefault: data.isDefault,
-        isPublic: data.isPublic, config: data.config,
-      })
-    }
-    ElMessage.success('过滤条件已保存')
-    filterDialog.visible = false
-  } catch {
-    // handled
-  } finally {
-    filterDialog.loading = false
-  }
-}
-
-// ---- Time format ----
-function openTimeDialog() {
-  timeState.value = getTimeFormat()
-  timeDialog.visible = true
-}
-
-async function applyTimeFormat(data: TimeFormatConfig, persist: boolean) {
-  if (!persist) {
-    // Already applied in-memory by the dialog.
-    ElMessage.success('时间格式已应用（本会话）')
-    return
-  }
-  timeDialog.loading = true
-  try {
-    const existing = (await fetchPrefs('timeformat')).find((p) => p.name === 'default-time-format')
-    if (existing) {
-      await updatePref(existing.id, {
-        name: 'default-time-format', isDefault: true, isPublic: false, config: data.config,
-      })
-    } else {
-      await createPref({
-        type: 'timeformat', name: 'default-time-format', isDefault: true,
-        isPublic: false, config: data.config,
-      })
-    }
-    ElMessage.success('时间格式已保存为默认设置')
-  } catch {
-    // handled
-  } finally {
-    timeDialog.loading = false
-  }
+function onSaveView(data: ViewConfig) {
+  saveView(data, loadEvents)
 }
 
 // ---- User commands ----
@@ -532,31 +245,13 @@ async function onUserCommand(cmd: string) {
   }
 }
 
-// ---- Auto refresh ----
-function startAutoRefresh() {
-  stopAutoRefresh()
-  refreshTimer = window.setInterval(() => loadEvents(), 15000)
-}
-
-function stopAutoRefresh() {
-  if (refreshTimer) {
-    window.clearInterval(refreshTimer)
-    refreshTimer = undefined
-  }
-}
-
-watch(autoRefresh, (v) => {
-  if (v) startAutoRefresh()
-  else stopAutoRefresh()
-})
-
+// ---- Lifecycle ----
 onMounted(async () => {
   await Promise.all([loadViews(), loadOperations(), loadTimeFormat()])
   loadEvents()
   buildInfo.value = await fetchBuildInfo()
 })
 
-onUnmounted(stopAutoRefresh)
 </script>
 
 <style scoped>

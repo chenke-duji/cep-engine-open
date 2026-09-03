@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { getToken } from '@/api/http'
+import { getToken, isTokenExpired } from '@/api/http'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,7 +23,7 @@ router.beforeEach((to) => {
   if (to.meta.public) {
     return true
   }
-  if (!getToken()) {
+  if (!getToken() || isTokenExpired()) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   return true

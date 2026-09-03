@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ViewConfig, ColumnDef } from '@/types'
 import { useAuthStore } from '@/stores/auth'
@@ -81,7 +81,7 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
-const isAdmin = auth.isAdmin
+const isAdmin = computed(() => auth.isAdmin)
 
 const availableFields = [
   'identifier', 'node', 'nodeAlias', 'severity', 'summary', 'status',
@@ -175,7 +175,7 @@ function save() {
     isPublic: form.isPublic,
     // Deep-copy the columns so the submitted payload reflects the current form
     // state and never shares a reference with the original view object.
-    config: { columns: JSON.parse(JSON.stringify(form.config.columns)) },
+    config: { columns: structuredClone(form.config.columns) },
   })
 }
 </script>

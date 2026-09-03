@@ -3,6 +3,7 @@
     <div
       v-if="visible"
       class="context-menu"
+      role="menu"
       :style="{ left: menuLeft + 'px', top: menuTop + 'px' }"
       @click.stop
     >
@@ -13,17 +14,18 @@
         v-for="op in operations"
         :key="op.name"
         class="context-menu-item"
+        role="menuitem"
         :class="{ disabled: !isEnabled(op) }"
         :title="op.confirmMessage || ''"
         @click="onClick(op)"
       >
         {{ op.menuLabel }}
       </div>
-      <div v-if="operations.length === 0" class="context-menu-item disabled">
+      <div v-if="operations.length === 0" class="context-menu-item disabled" role="menuitem">
         无可执行操作
       </div>
       <div class="context-menu-divider"></div>
-      <div class="context-menu-item" @click="onDetail">
+      <div class="context-menu-item" role="menuitem" @click="onDetail">
         <span class="detail-icon">i</span> 详细信息
       </div>
     </div>
@@ -70,7 +72,7 @@ function isEnabled(op: Operation): boolean {
   if (!op.enableWhen) return true
   if (props.selectedRows.length === 0) return true
   const cond = op.enableWhen.trim()
-  const match = cond.match(/^([A-Za-z0-9_.]+)\s*(!?=)\s*(.*)$/)
+  const match = cond.match(/^([A-Za-z0-9_.]+)\s*(>=|<=|!=|>|<|=)\s*(.*)$/)
   if (!match) return true
   const [, field, operator, value] = match
   const target = value.replace(/^['"]|['"]$/g, '')
@@ -78,10 +80,20 @@ function isEnabled(op: Operation): boolean {
   // Every selected row must satisfy the condition.
   for (const row of props.selectedRows) {
     const actual = String((row as Record<string, unknown>)[field] ?? '')
+    const actualNum = Number(actual)
+    const targetNum = Number(target)
     if (operator === '=') {
       if (actual !== target) return false
     } else if (operator === '!=') {
       if (actual === target) return false
+    } else if (operator === '>') {
+      if (Number.isNaN(actualNum) || Number.isNaN(targetNum) || !(actualNum > targetNum)) return false
+    } else if (operator === '>=') {
+      if (Number.isNaN(actualNum) || Number.isNaN(targetNum) || !(actualNum >= targetNum)) return false
+    } else if (operator === '<') {
+      if (Number.isNaN(actualNum) || Number.isNaN(targetNum) || !(actualNum < targetNum)) return false
+    } else if (operator === '<=') {
+      if (Number.isNaN(actualNum) || Number.isNaN(targetNum) || !(actualNum <= targetNum)) return false
     }
   }
   return true

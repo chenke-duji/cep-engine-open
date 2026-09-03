@@ -62,12 +62,17 @@ const severities = [
   { value: 0, label: 'Clear' },
 ]
 
+/** Escape regex metacharacters in user input to prevent ReDoS. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function onSearch() {
   // node/severity/status -> backend MongoDB filter.
   const conds: Record<string, unknown>[] = []
   if (form.severity != null) conds.push({ severity: form.severity })
   const node = form.node.trim()
-  if (node) conds.push({ node: { $regex: node, $options: 'i' } })
+  if (node) conds.push({ node: { $regex: escapeRegex(node), $options: 'i' } })
   const status = form.status.trim()
   if (status) conds.push({ status })
 

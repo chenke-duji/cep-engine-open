@@ -40,13 +40,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
-import timezone from 'dayjs/plugin/timezone'
 import type { TimeFormatConfig } from '@/types'
-import { setTimeFormat } from '@/utils/time'
-
-dayjs.extend(utc)
-dayjs.extend(timezone)
+import { useTimeStore } from '@/stores/time'
 
 const props = defineProps<{
   visible: boolean
@@ -116,7 +111,8 @@ const previewText = computed(() => {
 })
 
 function save() {
-  setTimeFormat(form.format, form.timezone, form.showTimezone)
+  const timeStore = useTimeStore()
+  timeStore.setTimeFormat(form.format, form.timezone, form.showTimezone)
   emit('apply', {
     name: 'default-time-format',
     isDefault: true,
