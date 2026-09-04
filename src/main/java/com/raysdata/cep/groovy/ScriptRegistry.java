@@ -272,6 +272,14 @@ public class ScriptRegistry {
                     rules.add(sourceRule("syslog"));
                 } else if (name.contains("snmp_trap")) {
                     rules.add(sourceRule("snmp_trap"));
+                } else if (name.startsWith("alertmanager")) {
+                    // Extract source from filename:
+                    //   alertmanager_parser.groovy          -> "alertmanager"
+                    //   alertmanager_prod_parser.groovy     -> "alertmanager_prod"
+                    //   alertmanager_staging_parser.groovy  -> "alertmanager_staging"
+                    String scriptName = name.replace(".groovy", "");
+                    String source = scriptName.replaceFirst("_parser$", "");
+                    rules.add(sourceRule(source));
                 }
             }
         } catch (Exception e) {
