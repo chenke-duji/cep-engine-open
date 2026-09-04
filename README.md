@@ -169,3 +169,7 @@ or third-party rule text is embedded):
 
 Please read `LICENSE` (Apache-2.0) before contributing. Contributions are
 welcome via pull requests and must follow the Apache-2.0 contribution terms.
+
+## Contact
+
+- Email: chenke@dujitech.cn
