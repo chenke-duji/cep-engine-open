@@ -1,0 +1,28 @@
+# Build output
+target/
+cep-web/dist/
+cep-web/node_modules/
+
+# Docker artifacts (avoid recursive include)
+docker/.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.settings/
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime
+data/
+*.pid
+*.log
+logs/
+
+# Local overrides (never leak secrets)
+**/application-prod.yml
+**/application-local.yml

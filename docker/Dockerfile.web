@@ -1,0 +1,44 @@
+# ============================================================
+# CEP Event Console (frontend) - Dockerfile (multi-stage)
+# Builds the Vue SPA and serves it with nginx.
+# ============================================================
+# Build:
+#   docker build -f docker/Dockerfile.web -t cep-web:latest .
+# ============================================================
+
+# ---- Stage 1: Node build ----
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Copy manifests first for dependency caching
+COPY cep-web/package.json cep-web/package-lock.json ./
+RUN npm ci
+
+# Copy source and build
+COPY cep-web/ ./
+RUN npm run build
+
+# ---- Stage 2: nginx runtime ----
+FROM nginx:1.27-alpine
+
+LABEL org.opencontainers.image.title="CEP Event Console" \
+      org.opencontainers.image.description="CEP Event Management Frontend" \
+      org.opencontainers.image.source="https://github.com/chenke-duji/cep-engine-open"
+
+# Remove default config and static files
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
+
+# Copy built SPA
+COPY --from=builder /build/dist/ /usr/share/nginx/html/
+
+# Copy Docker-adapted nginx config
+COPY docker/nginx-docker.conf /etc/nginx/conf.d/cep-web.conf
+
+# Copy TLS certs (self-signed for dev/internal; replace for production)
+COPY cep-web/deploy/tls/ /etc/nginx/tls/
+
+EXPOSE 9443 9988
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
+    CMD wget -q --spider http://localhost:9988/ || exit 1

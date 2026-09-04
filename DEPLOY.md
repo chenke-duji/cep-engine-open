@@ -3,6 +3,116 @@
 This guide walks through a production deployment of the CEP Event Engine:
 MongoDB, build, configuration, run, and verification.
 
+Two deployment paths are covered:
+
+| Path | When to use | Section |
+|------|-------------|---------|
+| **Docker Compose** (recommended) | Quick start, dev, CI, single-host prod | [§ Docker Compose](#docker-compose) below |
+| **Bare metal** | Custom infrastructure, existing MongoDB/Nginx | [§ Bare Metal](#1-prerequisites) below |
+
+---
+
+## Docker Compose
+
+The `docker/` directory contains a complete multi-service stack:
+**MongoDB 7 + cep-engine (Spring Boot) + cep-web (Nginx)**.
+
+### Architecture
+
+```
+                    ┌──────────────────────────────────────────────┐
+                    │  Host                                         │
+                    │                                               │
+  :9443 HTTPS ─────►│  cep-web (nginx)  ── /api/ ──►  cep-engine   │
+  :9988 HTTP  ─────►│  (SPA + reverse proxy)       (:8080)         │
+                    │                                      │        │
+                    │  cep-engine ── MONGO_URI ──►  mongo  │        │
+                    │                                      │        │
+  :27017 ──────────►│  mongo:7  (init scripts, indexes)    │        │
+                    └──────────────────────────────────────────────┘
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `docker/Dockerfile` | Multi-stage build: Maven → JRE 21 runtime |
+| `docker/Dockerfile.web` | Multi-stage build: Node 20 → Nginx |
+| `docker/docker-compose.yml` | Service orchestration (mongo + engine + web) |
+| `docker/nginx-docker.conf` | Nginx config adapted for Docker networking |
+| `docker/.env.example` | Environment template (copy to `.env`) |
+| `docker/.dockerignore` | Build context exclusions |
+| `docker/mongo-init.js` | MongoDB collections + indexes (first start) |
+
+### Quick Start
+
+```bash
+cd docker
+cp .env.example .env        # edit secrets!
+docker compose up -d
+```
+
+After startup:
+- **Console**: https://localhost:9443 (accept self-signed cert for dev)
+- **API**: https://localhost:9443/api/
+- **Backend health**: http://localhost:8080/actuator/health
+
+### Configuration
+
+All secrets are in `.env` (never committed). Key variables:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `MONGO_ROOT_USER` | `cep` | MongoDB root user |
+| `MONGO_ROOT_PASSWORD` | `change-me` | **Set a strong password** |
+| `CEP_JWT_SECRET` | (placeholder) | ≥ 32 chars, `openssl rand -hex 32` |
+| `CEP_ADMIN_USER` | `admin` | Bootstrap admin username |
+| `CEP_ADMIN_PASSWORD` | (empty) | Empty = auto-generated on first start |
+
+**No rebuild needed for config changes** — the `config/` and `conf/groovy/`
+directories are mounted as volumes, so editing `config/application.yml` or
+hot-reloading Groovy scripts takes effect immediately.
+
+### Optional: prometheus-webhook
+
+The `docker-compose.yml` includes a commented-out `prometheus-webhook`
+service. To enable it:
+
+1. Uncomment the `prometheus-webhook` block in `docker-compose.yml`.
+2. Set `WEBHOOK_AUTH_TOKEN` in `.env`.
+3. Configure Alertmanager to send webhooks to `http://<host>:9093/webhook`.
+4. `docker compose up -d prometheus-webhook`
+
+### Production TLS
+
+The image bundles self-signed certificates for dev/internal use. For
+production, mount CA-signed certificates:
+
+```yaml
+# docker-compose.yml — override the cert volume
+volumes:
+  - /path/to/prod.crt:/etc/nginx/tls/self-signed.crt:ro
+  - /path/to/prod.key:/etc/nginx/tls/self-signed.key:ro
+```
+
+### Common Commands
+
+```bash
+docker compose up -d              # start all services
+docker compose logs -f cep-engine # follow backend logs
+docker compose restart cep-engine # restart after config change
+docker compose down              # stop (keeps data volume)
+docker compose down -v           # stop + delete MongoDB data
+docker compose build             # rebuild after code changes
+```
+
+---
+
+## Bare Metal
+
+The following sections cover bare-metal deployment for environments where
+Docker is unavailable or a custom infrastructure is required.
+
 ## 1. Prerequisites
 
 - **Java 21+** (JDK) — build & run

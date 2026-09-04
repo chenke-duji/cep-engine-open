@@ -1,0 +1,116 @@
+# ============================================================
+# CEP Event Engine - Docker Compose
+# Full-stack: MongoDB + cep-engine + cep-web (nginx)
+# ============================================================
+# Quick start:
+#   cd docker
+#   cp .env.example .env      # edit secrets
+#   docker compose up -d
+#
+# Access:
+#   Console:  https://localhost:9443  (or http://localhost:9988 → redirect)
+#   API:      https://localhost:9443/api/
+#   Health:   http://localhost:8080/actuator/health  (internal)
+#
+# Optional: prometheus-webhook (uncomment below)
+# ============================================================
+
+services:
+  # ---- MongoDB ----
+  mongo:
+    image: mongo:7
+    container_name: cep-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-cep}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-change-me}
+      MONGO_INITDB_DATABASE: cep
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---- CEP Engine (backend) ----
+  cep-engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: cep-engine
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      # MongoDB — connects to the mongo service
+      MONGO_URI: mongodb://${MONGO_ROOT_USER:-cep}:${MONGO_ROOT_PASSWORD:-change-me}@mongo:27017/cep?authSource=admin
+      MONGO_DATABASE: cep
+      # Security
+      CEP_JWT_SECRET: ${CEP_JWT_SECRET:-change-this-to-a-random-32-char-secret}
+      CEP_ADMIN_USER: ${CEP_ADMIN_USER:-admin}
+      CEP_ADMIN_PASSWORD: ${CEP_ADMIN_PASSWORD:-}
+      # CORS (empty = same-origin via nginx, recommended)
+      CEP_CORS_ALLOWED_ORIGINS: ""
+      # JVM
+      JAVA_OPTS: "-Xms256m -Xmx1024m -XX:+UseZGC -Dfile.encoding=UTF-8"
+    volumes:
+      # Override config without rebuilding the image
+      - ../config:/app/config:ro
+      # Hot-reload Groovy scripts at runtime
+      - ../conf/groovy:/app/conf/groovy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ---- CEP Web (frontend + nginx reverse proxy) ----
+  cep-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    container_name: cep-web
+    restart: unless-stopped
+    depends_on:
+      cep-engine:
+        condition: service_healthy
+    ports:
+      - "9443:9443"   # HTTPS
+      - "9988:9988"   # HTTP → redirect to 9443
+
+  # ---- Optional: prometheus-webhook ----
+  # Uncomment to enable Alertmanager webhook ingestion.
+  # Requires the prometheus-webhook binary in a sibling directory.
+  #
+  # prometheus-webhook:
+  #   image: ghcr.io/chenke-duji/prometheus-webhook:latest
+  #   # Or build from source:
+  #   # build:
+  #   #   context: ../prometheus-webhook
+  #   #   dockerfile: Dockerfile
+  #   container_name: prometheus-webhook
+  #   restart: unless-stopped
+  #   depends_on:
+  #     cep-engine:
+  #       condition: service_healthy
+  #   environment:
+  #     AMWH_WEBHOOK_AUTH_TOKEN: ${WEBHOOK_AUTH_TOKEN:-change-me}
+  #     AMWH_WEBHOOK_SOURCE: alertmanager
+  #     AMWH_WEBHOOK_DOMAIN_ID: default
+  #     AMWH_CEP_BASE_URL: http://cep-engine:8080
+  #     AMWH_WEBHOOK_LISTEN_ADDR: "0.0.0.0:9093"
+  #   ports:
+  #     - "9093:9093"
+
+volumes:
+  mongo-data:
+    driver: local
