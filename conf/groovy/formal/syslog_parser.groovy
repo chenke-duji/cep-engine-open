@@ -63,7 +63,10 @@ if (metadata.get("timestamp") != null) {
     ts = parseMillis(metadata.get("timestamp").toString())
 }
 if (ts <= 0) {
-    try { if (rawEvent.getOriginTimestamp() > 0) ts = rawEvent.getOriginTimestamp() } catch (Exception ignored) {}
+    try {
+        long ot = rawEvent.getOriginTimestamp()
+        if (ot > 0) ts = normalizeMillis(ot)
+    } catch (Exception ignored) {}
 }
 if (ts <= 0) ts = System.currentTimeMillis()
 event.setFirstOccurrence(ts)
@@ -128,9 +131,19 @@ long parseMillis(String s) {
         return odt.toInstant().toEpochMilli()
     } catch (Exception ignored) {
         try {
-            return Long.parseLong(s)
+            return normalizeMillis(Long.parseLong(s))
         } catch (Exception ignored2) {
             return 0
         }
     }
+}
+
+// Normalize epoch nanos/micros/millis to millis.
+// - >= 1e17 (19+ digits): nanoseconds -> / 1,000,000
+// - >= 1e14 (16+ digits): microseconds -> / 1,000
+// - otherwise: assume milliseconds
+long normalizeMillis(long v) {
+    if (v >= 100_000_000_000_000_000L) return v / 1_000_000
+    if (v >= 100_000_000_000_000L)      return v / 1_000
+    return v
 }
