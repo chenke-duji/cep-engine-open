@@ -14,9 +14,9 @@
  *   - modify(event) to use modified event for dedup
  */
 
-import com.raysdata.cep.model.HookResult
-import com.raysdata.cep.model.HookContext
-import com.raysdata.cep.groovy.EventHook
+import com.dujitech.cep.model.HookResult
+import com.dujitech.cep.model.HookContext
+import com.dujitech.cep.groovy.EventHook
 
 class BeforeDedupHook implements EventHook {
 

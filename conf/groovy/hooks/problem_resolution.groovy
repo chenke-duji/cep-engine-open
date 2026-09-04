@@ -19,10 +19,10 @@
  *   - MATCH with pairKey = the matched Problem's full identifier
  */
 
-import com.raysdata.cep.model.HookResult
-import com.raysdata.cep.model.HookContext
-import com.raysdata.cep.model.EventType
-import com.raysdata.cep.groovy.EventHook
+import com.dujitech.cep.model.HookResult
+import com.dujitech.cep.model.HookContext
+import com.dujitech.cep.model.EventType
+import com.dujitech.cep.groovy.EventHook
 
 class ProblemResolutionHook implements EventHook {
 
@@ -55,7 +55,7 @@ class ProblemResolutionHook implements EventHook {
         // Check if the Problem event exists in the active store
         def activeProblem = ctx.getActiveEvent(problemIdentifier)
         if (activeProblem != null) {
-            def result = new HookResult(com.raysdata.cep.model.ResultAction.MATCH)
+            def result = new HookResult(com.dujitech.cep.model.ResultAction.MATCH)
             // pairKey carries the matched Problem's full identifier so the Java
             // chain can atomically resolve it.
             result.setPairKey(problemIdentifier)

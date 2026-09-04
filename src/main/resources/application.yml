@@ -152,7 +152,7 @@ management:
 # ============================================
 logging:
   level:
-    com.raysdata.cep: INFO
+    com.dujitech.cep: INFO
     org.springframework.data.mongodb: WARN
     org.apache.kafka: WARN
   pattern:

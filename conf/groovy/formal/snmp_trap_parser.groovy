@@ -11,9 +11,9 @@
  * This script is stored in conf/groovy/formal/ and hot-loaded by ScriptRegistry.
  */
 
-import com.raysdata.cep.model.AlarmEvent
-import com.raysdata.cep.model.EventType
-import com.raysdata.cep.model.Severity
+import com.dujitech.cep.model.AlarmEvent
+import com.dujitech.cep.model.EventType
+import com.dujitech.cep.model.Severity
 import com.google.gson.JsonParser
 
 // Parse the raw event payload

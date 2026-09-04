@@ -9,9 +9,9 @@
  *   summary    = all field key-value pairs concatenated
  */
 
-import com.raysdata.cep.model.AlarmEvent
-import com.raysdata.cep.model.EventType
-import com.raysdata.cep.model.Severity
+import com.dujitech.cep.model.AlarmEvent
+import com.dujitech.cep.model.EventType
+import com.dujitech.cep.model.Severity
 
 // ===== Trap OID -> definition mapping =====
 // Key: fully resolved numeric OID, Value: [name, fields, fieldOids]

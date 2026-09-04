@@ -19,9 +19,9 @@
  * agentType is "syslog" (different ingestion interfaces never pair).
  */
 
-import com.raysdata.cep.model.AlarmEvent
-import com.raysdata.cep.model.EventType
-import com.raysdata.cep.model.Severity
+import com.dujitech.cep.model.AlarmEvent
+import com.dujitech.cep.model.EventType
+import com.dujitech.cep.model.Severity
 
 def event = new AlarmEvent()
 def metadata = rawEvent.getMetadata() ?: [:]

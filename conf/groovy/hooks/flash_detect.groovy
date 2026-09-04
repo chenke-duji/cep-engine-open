@@ -12,9 +12,9 @@
  *   - suppress("FLASH") if threshold exceeded
  */
 
-import com.raysdata.cep.model.HookResult
-import com.raysdata.cep.model.HookContext
-import com.raysdata.cep.groovy.EventHook
+import com.dujitech.cep.model.HookResult
+import com.dujitech.cep.model.HookContext
+import com.dujitech.cep.groovy.EventHook
 
 class FlashDetectHook implements EventHook {
 

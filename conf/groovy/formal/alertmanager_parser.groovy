@@ -20,8 +20,8 @@
  * alertKey = Alertmanager native fingerprint (firing and resolved share the same value).
  */
 
-import com.raysdata.cep.model.AlarmEvent
-import com.raysdata.cep.model.EventType
+import com.dujitech.cep.model.AlarmEvent
+import com.dujitech.cep.model.EventType
 
 def event = new AlarmEvent()
 def metadata = rawEvent.getMetadata() ?: [:]
@@ -73,7 +73,7 @@ event.setOriginalSeverity(sev)
 
 // EventType: resolved -> RESOLUTION (code="2"), else PROBLEM (code="1")
 // EventType.PROBLEM.code="1" and EventType.RESOLUTION.code="2" are defined
-// in com.raysdata.cep.model.EventType. The same pairKey is shared across
+// in com.dujitech.cep.model.EventType. The same pairKey is shared across
 // both types, enabling automatic Problem->Resolution pairing.
 String status = metadata.get("status")?.toString() ?: "firing"
 String eventType = (status == "resolved") ? EventType.RESOLUTION.code : EventType.PROBLEM.code

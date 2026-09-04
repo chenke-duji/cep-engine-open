@@ -113,7 +113,7 @@ cep:
 logging:
   level:
     # Change to DEBUG to troubleshoot event processing / Problem-Resolution pairing.
-    com.raysdata.cep: INFO
+    com.dujitech.cep: INFO
     # Mongo query logging - set to DEBUG to see executed queries.
     org.springframework.data.mongodb: WARN
     org.apache.kafka: WARN

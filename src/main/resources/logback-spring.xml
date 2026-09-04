@@ -31,8 +31,8 @@
         <appender-ref ref="FILE"/>
     </appender>
 
-    <logger name="com.raysdata.cep" level="INFO"/>
-    <logger name="com.raysdata.cep.groovy" level="DEBUG"/>
+    <logger name="com.dujitech.cep" level="INFO"/>
+    <logger name="com.dujitech.cep.groovy" level="DEBUG"/>
     <logger name="org.springframework.data.mongodb" level="WARN"/>
     <logger name="org.apache.kafka" level="WARN"/>
     <logger name="org.mongodb.driver" level="WARN"/>

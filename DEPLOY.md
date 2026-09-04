@@ -170,7 +170,7 @@ Key values to adjust in `config/application.yml`:
 - `spring.data.mongodb.username` / `password` / `authentication-database` — MongoDB
   auth (alternative to embedding credentials in the URI). Overridable via
   `MONGO_URI` / `MONGO_DATABASE` / `MONGO_USERNAME` / `MONGO_PASSWORD` / `MONGO_AUTH_DB`
-- `logging.level.com.raysdata.cep` — set `DEBUG` to trace Problem/Resolution pairing
+- `logging.level.com.dujitech.cep` — set `DEBUG` to trace Problem/Resolution pairing
 - `server.port` — HTTP port
 - `cep.security.jwt.secret` / `cep.security.bootstrap-admin.password` — auth
 
